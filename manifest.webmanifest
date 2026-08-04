@@ -1,0 +1,14 @@
+{
+  "name": "Fuel",
+  "short_name": "Fuel",
+  "description": "Photo-powered food logging, micros, and your real TDEE",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7FAF9",
+  "theme_color": "#0D9488",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

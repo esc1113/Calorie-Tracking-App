@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>Fuel</title>
+
+  <!-- ============================================================
+       FUEL CONFIG — the ONLY part you need to edit.
+       1) firebase: paste your firebaseConfig from the Firebase
+          console (Project settings → Your apps → SDK setup).
+          You can reuse the same project as your habit tracker.
+       2) workerUrl: your Cloudflare Worker URL (see README step 3).
+          Leave "" to run without AI photo/describe features.
+       3) usdaKey: free key from https://api.data.gov/signup
+          (optional — enables the full USDA database in Online
+          search; Open Food Facts works without any key).
+       ============================================================ -->
+  <script>
+    window.FUEL_CONFIG = {
+      firebase: {
+        apiKey: "PASTE_YOUR_API_KEY",
+        authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+        projectId: "PASTE_YOUR_PROJECT_ID",
+        storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+        messagingSenderId: "PASTE_YOUR_SENDER_ID",
+        appId: "PASTE_YOUR_APP_ID"
+      },
+      workerUrl: "",
+      usdaKey: ""
+    };
+  </script>
+
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#F7FAF9" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Fuel" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #F7FAF9; }
+    * { -webkit-tap-highlight-color: transparent; }
+    input, select, textarea { font-family: inherit; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="./app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+    }
+  </script>
+</body>
+</html>
