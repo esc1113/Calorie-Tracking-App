@@ -43,3 +43,6 @@ worker update cycle).
 
 ## v3.0
 - **App password sign-in** — the reliable path for the installed iPhone app. One-time setup: (1) Firebase console → Authentication → Sign-in method → enable **Email/Password**; (2) open the site in Safari (already signed in) → Settings → **App password** → set one; (3) in the installed app, sign in with your Gmail address + that password. It's linked to the same Google account, so all data is identical. No popups, no redirects — nothing iOS can break.
+
+## v3.0.1
+- **iPhone keyboard fix**: removed `user-scalable=no` from the viewport (a known iOS cause of inputs that focus but never raise the keyboard). Patched at runtime from app.js AND recommended as a one-line index.html edit. Inputs also forced selectable as insurance.
