@@ -25,3 +25,6 @@ worker update cycle).
 
 ## v2.4
 - **Add-food sheet no longer sinks under the keyboard**: the sheet is now fixed-height, so the search box stays at the top of the screen no matter how short the filtered list gets. Search inputs are also sticky, so they stay visible while scrolling long result lists. Same fix applied to the recipe builder.
+
+## v2.5
+- **✕ close button on the Add-food sheet** — v2.4's taller sheet left almost no backdrop to tap, which could trap you in the logging page. The ✕ in the header always exits (and cancels a batch label import mid-way).
