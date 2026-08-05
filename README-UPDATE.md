@@ -55,3 +55,10 @@ worker update cycle).
 
 ## v3.0.4
 - **Tap-only sign-in**: 📋 paste buttons beside the email and password fields fill them from the clipboard (with iOS's permission prompt) — sign in with zero keyboard use when the iOS keyboard bug strikes at launch. Version number now shows on the sign-in screen so you can verify the build before signing in.
+
+## v3.1
+- **Units that make sense per food**: liquids now show and log in **ml** (milks and juices updated automatically), solids in **g**; every label reflects the food's real unit. Grams stays the general default. You can set the amount + unit per serving for any food in its editor (Library → tap food).
+- **Recipe amount popup**: tapping an ingredient (to add it or to change it) opens the same chooser as logging — type servings or type g/ml, live kcal — then Add/Update. No more cramped inline steppers.
+
+## v3.2
+- **Swipe left to delete** on phone for Library foods and logged entries — the delete button no longer sits beside +. Swipe reveals a red Delete; tap anywhere or swipe back to close. Vertical scrolling is unaffected. On desktop (no touch), the inline × remains.
