@@ -34,3 +34,6 @@ worker update cycle).
 
 ## v2.7
 - **Collapsible meal sections** (Cronometer-style): tap a meal header to fold it down to just the name + calorie subtotal (+ item count). State is remembered between sessions. Logging into a collapsed meal auto-expands it so nothing lands invisibly. The + button still works either way.
+
+## v2.8
+- **Search bar fixed for real**: removed the sticky-positioned inputs (mobile Safari makes sticky form fields untappable after scrolling) and rebuilt the sheet as fixed rows — header, tabs, search box — with only the results list scrolling. The search bar now sits in a normal, always-tappable position above the list on every tab.
