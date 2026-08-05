@@ -37,3 +37,6 @@ worker update cycle).
 
 ## v2.8
 - **Search bar fixed for real**: removed the sticky-positioned inputs (mobile Safari makes sticky form fields untappable after scrolling) and rebuilt the sheet as fixed rows — header, tabs, search box — with only the results list scrolling. The search bar now sits in a normal, always-tappable position above the list on every tab.
+
+## v2.9
+- **Sign-in fixed for the installed app**: home-screen apps on iPhone open Google sign-in in a popup where the keyboard can never appear (buttons work, typing doesn't). The app now detects installed mode and uses the full-page redirect flow instead — you bounce to the real Google page and back. Redirect errors are now surfaced on the sign-in screen instead of failing silently.
