@@ -49,3 +49,9 @@ worker update cycle).
 
 ## v3.0.2
 - **Keyboard-wedge mitigation for iPhone**: the app now blurs any focused input the instant it's backgrounded or the phone locks (the main trigger of iOS's "keyboard stops appearing" bug in home-screen apps), and force-focuses inputs whose tap didn't land. Recovery if it ever wedges anyway: force-close the app first; restart the phone only if that doesn't do it.
+
+## v3.0.3
+- **Photo-picker keyboard fix**: returning from the native camera/photo picker can wedge the iOS keyboard in installed apps — the app now runs a silent focus-cycle on your first tap after any picker use to re-engage the keyboard before you hit a real input.
+
+## v3.0.4
+- **Tap-only sign-in**: 📋 paste buttons beside the email and password fields fill them from the clipboard (with iOS's permission prompt) — sign in with zero keyboard use when the iOS keyboard bug strikes at launch. Version number now shows on the sign-in screen so you can verify the build before signing in.
