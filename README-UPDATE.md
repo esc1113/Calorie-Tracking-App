@@ -28,3 +28,9 @@ worker update cycle).
 
 ## v2.5
 - **✕ close button on the Add-food sheet** — v2.4's taller sheet left almost no backdrop to tap, which could trap you in the logging page. The ✕ in the header always exits (and cancels a batch label import mid-way).
+
+## v2.6
+- **✕ moved to the top-left and made permanently visible**: the Add-food sheet now has a fixed header bar that never scrolls away — the close button is on screen at all times, at any scroll position, keyboard open or not. Recipe builder got a top-left ✕ too.
+
+## v2.7
+- **Collapsible meal sections** (Cronometer-style): tap a meal header to fold it down to just the name + calorie subtotal (+ item count). State is remembered between sessions. Logging into a collapsed meal auto-expands it so nothing lands invisibly. The + button still works either way.
