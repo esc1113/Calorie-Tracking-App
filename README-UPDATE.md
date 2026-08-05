@@ -40,3 +40,6 @@ worker update cycle).
 
 ## v2.9
 - **Sign-in fixed for the installed app**: home-screen apps on iPhone open Google sign-in in a popup where the keyboard can never appear (buttons work, typing doesn't). The app now detects installed mode and uses the full-page redirect flow instead — you bounce to the real Google page and back. Redirect errors are now surfaced on the sign-in screen instead of failing silently.
+
+## v3.0
+- **App password sign-in** — the reliable path for the installed iPhone app. One-time setup: (1) Firebase console → Authentication → Sign-in method → enable **Email/Password**; (2) open the site in Safari (already signed in) → Settings → **App password** → set one; (3) in the installed app, sign in with your Gmail address + that password. It's linked to the same Google account, so all data is identical. No popups, no redirects — nothing iOS can break.
