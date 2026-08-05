@@ -46,3 +46,6 @@ worker update cycle).
 
 ## v3.0.1
 - **iPhone keyboard fix**: removed `user-scalable=no` from the viewport (a known iOS cause of inputs that focus but never raise the keyboard). Patched at runtime from app.js AND recommended as a one-line index.html edit. Inputs also forced selectable as insurance.
+
+## v3.0.2
+- **Keyboard-wedge mitigation for iPhone**: the app now blurs any focused input the instant it's backgrounded or the phone locks (the main trigger of iOS's "keyboard stops appearing" bug in home-screen apps), and force-focuses inputs whose tap didn't land. Recovery if it ever wedges anyway: force-close the app first; restart the phone only if that doesn't do it.
