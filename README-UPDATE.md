@@ -14,3 +14,14 @@ worker update cycle).
 ## v2 (if you skipped it)
 - 🥦 Diet tab: eat-next recommendations, weekly targets with days-left, fridge expiry tracking, gut-protocol ramp holds, distinct-plants & fermented-variety counters.
 - Foods carry diet-group tags (AI-assigned on photo import, editable per food).
+
+## v2.2
+- **Tap any logged item** on Today to edit it: change servings, type exact grams, move it to a different meal, or delete — macros, micros, and diet tags all rescale correctly.
+- **Separate Camera / Upload buttons** on Photo — Upload opens your photo library so screenshots finally work (the old single button forced the camera on phones).
+
+## v2.3
+- **Type the number of servings directly** everywhere: log pane, entry editor, and recipe builder (both ingredient amounts and "makes N servings"). Any value works — 1.33, 3, 0.6. The +/- buttons remain for quick nudges. Servings and grams stay in sync both directions.
+- Settings footer now reads "Fuel v2.3" so you can confirm the build is live.
+
+## v2.4
+- **Add-food sheet no longer sinks under the keyboard**: the sheet is now fixed-height, so the search box stays at the top of the screen no matter how short the filtered list gets. Search inputs are also sticky, so they stay visible while scrolling long result lists. Same fix applied to the recipe builder.
