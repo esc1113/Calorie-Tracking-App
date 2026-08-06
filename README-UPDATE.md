@@ -62,3 +62,6 @@ worker update cycle).
 
 ## v3.2
 - **Swipe left to delete** on phone for Library foods and logged entries — the delete button no longer sits beside +. Swipe reveals a red Delete; tap anywhere or swipe back to close. Vertical scrolling is unaffected. On desktop (no touch), the inline × remains.
+
+## v3.3
+- **Plan future days**: the › arrow, calendar, and week/month hops now go forward. Future days show an amber "🗓 Planning ahead" (or "Tomorrow — planning") badge so they can't be mistaken for today. Planned days count toward Diet-tab weekly progress automatically once the date arrives; the adaptive TDEE only ever reads past days, so plans never skew it. Tip: on an empty future day, "Copy yesterday's log" clones the previous day as a starting template.
