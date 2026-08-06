@@ -76,3 +76,11 @@ worker update cycle).
 ## v3.5
 - **MFP-style home**: calorie card shows "eaten cal / goal" with "left" (or red "over") beside it — everything at a glance, no more tap-to-flip. Macros card below with colored dots and a ⇄ toggle between "eaten / goal" and "remaining" (red when over).
 - **MFP-style item detail**: picking a food to log (and tapping a logged entry) now shows a segmented calorie ring with Carbs/Fat/Protein percentages and grams, plus a collapsible "Nutrition facts" list — fat with saturated, carbs with fiber/sugar, protein, and all tracked micronutrients — all scaled live as you change servings or grams.
+
+## v3.6
+- **Recipes remember their ingredients**: tap a recipe in Library to see the full ingredient list and servings, and hit ✎ Edit recipe to change ingredients, amounts, or serving count — nutrition, micros, and diet-group tags all recalculate on save. New recipes also get proper diet tags summed from their ingredients (a broccoli-lentil soup now counts cruciferous + legumes automatically). Recipes made before this update show a note to recreate them once.
+
+## v3.6.1
+- **Day rollover fix**: if the app is left open (or suspended) past midnight, it now follows the calendar — the Today tab and the Diet tab's daily counters advance to the new day automatically on resume, resetting daily food-group progress as expected. (Weekly targets keep accumulating across the week, as designed.)
+- **Diet daily card follows the viewed day**: planning tomorrow now shows tomorrow's daily counters (starting from zero) with a "· planned" label, instead of always showing calendar-today.
+- Recipe fiber: the math has been correct since v3.6, but recipes created earlier were saved without fiber and without their ingredient list — recreate those once via + Recipe and they're fixed permanently.
