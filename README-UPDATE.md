@@ -69,3 +69,6 @@ worker update cycle).
 ## v3.4
 - **Per-meal ⋯ menu**: copy that meal from the previous day (relative to whichever day you're viewing — works for future planning), or clear just that section (tap-again-to-confirm).
 - **Day ⋯ menu** (top right on Today): copy the entire previous day, or clear the whole day — food only; weight and water stay.
+
+## v3.4.1
+- **Updates now land on the first relaunch**: the service worker revalidates files with the server on every fetch instead of trusting the CDN's 10-minute cache window — ends the "bookmark stuck one version behind" lag for all future updates.
