@@ -84,3 +84,6 @@ worker update cycle).
 - **Day rollover fix**: if the app is left open (or suspended) past midnight, it now follows the calendar — the Today tab and the Diet tab's daily counters advance to the new day automatically on resume, resetting daily food-group progress as expected. (Weekly targets keep accumulating across the week, as designed.)
 - **Diet daily card follows the viewed day**: planning tomorrow now shows tomorrow's daily counters (starting from zero) with a "· planned" label, instead of always showing calendar-today.
 - Recipe fiber: the math has been correct since v3.6, but recipes created earlier were saved without fiber and without their ingredient list — recreate those once via + Recipe and they're fixed permanently.
+
+## v3.7
+- **Daily steps tracking**: log steps on the Trends tab beside your weigh-in (today's count + 7-day average shown). Once ~4 weeks of steps overlap with your weigh-in/intake data, the app regresses YOUR historical TDEE windows against YOUR step averages and reports a personal "≈ +X kcal per 1,000 steps" estimate — refined continuously, labeled directional.
