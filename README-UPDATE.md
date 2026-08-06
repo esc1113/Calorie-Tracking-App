@@ -65,3 +65,7 @@ worker update cycle).
 
 ## v3.3
 - **Plan future days**: the › arrow, calendar, and week/month hops now go forward. Future days show an amber "🗓 Planning ahead" (or "Tomorrow — planning") badge so they can't be mistaken for today. Planned days count toward Diet-tab weekly progress automatically once the date arrives; the adaptive TDEE only ever reads past days, so plans never skew it. Tip: on an empty future day, "Copy yesterday's log" clones the previous day as a starting template.
+
+## v3.4
+- **Per-meal ⋯ menu**: copy that meal from the previous day (relative to whichever day you're viewing — works for future planning), or clear just that section (tap-again-to-confirm).
+- **Day ⋯ menu** (top right on Today): copy the entire previous day, or clear the whole day — food only; weight and water stay.
