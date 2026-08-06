@@ -72,3 +72,7 @@ worker update cycle).
 
 ## v3.4.1
 - **Updates now land on the first relaunch**: the service worker revalidates files with the server on every fetch instead of trusting the CDN's 10-minute cache window — ends the "bookmark stuck one version behind" lag for all future updates.
+
+## v3.5
+- **MFP-style home**: calorie card shows "eaten cal / goal" with "left" (or red "over") beside it — everything at a glance, no more tap-to-flip. Macros card below with colored dots and a ⇄ toggle between "eaten / goal" and "remaining" (red when over).
+- **MFP-style item detail**: picking a food to log (and tapping a logged entry) now shows a segmented calorie ring with Carbs/Fat/Protein percentages and grams, plus a collapsible "Nutrition facts" list — fat with saturated, carbs with fiber/sugar, protein, and all tracked micronutrients — all scaled live as you change servings or grams.
