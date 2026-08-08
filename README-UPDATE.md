@@ -87,3 +87,7 @@ worker update cycle).
 
 ## v3.7
 - **Daily steps tracking**: log steps on the Trends tab beside your weigh-in (today's count + 7-day average shown). Once ~4 weeks of steps overlap with your weigh-in/intake data, the app regresses YOUR historical TDEE windows against YOUR step averages and reports a personal "≈ +X kcal per 1,000 steps" estimate — refined continuously, labeled directional.
+
+## v3.8
+- **Tap the calorie card** on Today → jumps to the Trends calorie chart (MFP-style: 7-day bars, ‹ › to go back by weeks, tap a bar for that day's detail, tap the date range to jump anywhere).
+- **Steps history**: tap the 👟 Steps row on Trends → expands a 7-day bar chart with ‹ › week navigation. Tap any bar to edit or backfill that day's steps (or remove a bad entry). Backfilled days feed the steps↔TDEE estimate too.
