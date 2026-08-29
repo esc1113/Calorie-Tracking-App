@@ -1876,8 +1876,35 @@ function QuickFood({ T, addFoodToLib, close, say }) {
   </div>);
 }
 
+function IngredientAdd({ T, food, onAdd, close }) {
+  const u = servUnit(food);
+  const [v, setV] = useState(String(u ? u.amt : 1));
+  const qty = u ? (+v || 0) / u.amt : (+v || 0);
+  const commit = () => { if (+v > 0) onAdd(u ? +v / u.amt : +v); };
+  return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 65, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "16dvh" }} onClick={close}>
+    <div onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 48px)", maxWidth: 320, background: T.bg, borderRadius: 16, padding: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+      <div style={{ fontSize: 11, color: T.mut, marginTop: 2 }}>1 serving = {food.serving}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+        <input type="number" inputMode="decimal" step="any" min="0" autoFocus value={v}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && commit()}
+          style={{ ...inp(T), textAlign: "center", fontWeight: 700, fontSize: 17 }} />
+        <span style={{ fontSize: 13, color: T.sub, flexShrink: 0, maxWidth: 120, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u ? u.unit : `× ${food.serving}`}</span>
+      </div>
+      <div style={{ fontSize: 12, color: T.sub, marginTop: 8, textAlign: "center" }}>= <b style={{ color: T.mint }}>{fmtN(food.cal * qty)}</b> cal · P{rnd(food.p * qty, 1)} C{rnd(food.c * qty, 1)} F{rnd(food.f * qty, 1)}</div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button onClick={close} style={{ ...pill(T), flex: 1 }}>Cancel</button>
+        <button onClick={commit} style={{ ...pill(T), flex: 2, background: T.mint, color: "#fff", borderColor: T.mint }}>Add</button>
+      </div>
+    </div>
+  </div>);
+}
+
 function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFoodTags, close, say }) {
   const [drafts, setDrafts] = useState({});
+  const [adding, setAdding] = useState(null);
   const [name, setName] = useState(editing ? (copy ? editing.name + " (copy)" : editing.name) : "");
   const [servings, setServings] = useState(editing?.recipe?.servings || 1);
   const [items, setItems] = useState(editing?.recipe?.items ? editing.recipe.items.map((x) => ({ ...x })) : []);
@@ -1945,7 +1972,7 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
         <span style={{ fontSize: 13, color: T.sub }}>serving{servings > 1 ? "s" : ""}</span>
       </div>
       <input placeholder="Search ingredients from your library…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inp(T), marginTop: 12 }} />
-      {opts.map((f) => (<button key={f.id} onClick={() => { setItems([...items, { foodId: f.id, name: f.name, qty: 1 }]); setDrafts({}); setQ(""); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 4px", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, color: T.text, fontSize: 13, cursor: "pointer" }}>+ {f.name} <span style={{ color: T.mut }}>({f.serving}, {fmtN(f.cal)} kcal)</span></button>))}
+      {opts.map((f) => (<button key={f.id} onClick={() => setAdding(f)} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 4px", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, color: T.text, fontSize: 13, cursor: "pointer" }}>+ {f.name} <span style={{ color: T.mut }}>({f.serving}, {fmtN(f.cal)} kcal)</span></button>))}
       {items.map((it, i) => {
         const f = foods.find((x) => x.id === it.foodId);
         const u = f ? servUnit(f) : null;
@@ -1976,6 +2003,7 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
       })}
       {items.length > 0 && <div style={{ marginTop: 12, fontSize: 13, color: T.sub }}>Per serving: <b style={{ color: T.mint }}>{fmtN(tot.cal / servings)} kcal</b> · P{Math.round(tot.p / servings)} C{Math.round(tot.c / servings)} F{Math.round(tot.f / servings)} · fiber {rnd(tot.fiber / servings, 1)}g</div>}
       </div>
+      {adding && <IngredientAdd T={T} food={adding} onAdd={(qty) => { setItems([...items, { foodId: adding.id, name: adding.name, qty }]); setDrafts({}); setQ(""); setAdding(null); }} close={() => setAdding(null)} />}
       <div style={{ display: "flex", gap: 8, padding: "10px 16px calc(env(safe-area-inset-bottom) + 12px)", borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
         <button onClick={save} style={{ ...pill(T), flex: 1, background: T.mint, color: "#fff", borderColor: T.mint, padding: "12px" }}>{copy ? "Save copy" : isEdit ? "Save changes" : "Save recipe"}</button>
       </div>
