@@ -1,0 +1,11 @@
+{
+  "name": "fuel",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "^18",
+    "react-dom": "^18",
+    "firebase": "^11",
+    "esbuild": "^0.24"
+  }
+}
