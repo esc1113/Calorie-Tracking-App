@@ -748,7 +748,7 @@ export default function App() {
       {sheet && <AddSheet T={T} sheet={sheet} setSheet={setSheet} foods={foods} addFoodToLib={addFoodToLib} logFood={logFood} openQuick={() => { setSheet(null); setQuickOpen(true); }} say={say} />}
       {recipeOpen && <RecipeBuilder T={T} foods={foods} addFoodToLib={addFoodToLib} editing={recipeOpen.editing || null} copy={!!recipeOpen.copy} patchFood={patchFood} setFoodTags={setFoodTags} close={() => setRecipeOpen(false)} say={say} />}
       {quickOpen && <QuickFood T={T} addFoodToLib={addFoodToLib} close={() => setQuickOpen(false)} say={say} />}
-      {tagFood && <TagEditor T={T} food={tagFood} setFoodTags={setFoodTags} patchFood={patchFood} openRecipeEdit={(f) => { setTagFood(null); setRecipeOpen({ editing: f }); }} openRecipeCopy={(f) => { setTagFood(null); setRecipeOpen({ editing: f, copy: true }); }} close={() => setTagFood(null)} say={say} />}
+      {tagFood && <TagEditor T={T} food={tagFood} foods={foods} setFoodTags={setFoodTags} patchFood={patchFood} openRecipeEdit={(f) => { setTagFood(null); setRecipeOpen({ editing: f }); }} openRecipeCopy={(f) => { setTagFood(null); setRecipeOpen({ editing: f, copy: true }); }} close={() => setTagFood(null)} say={say} />}
       {editEntry && <EntryEdit T={T} info={editEntry} foods={foods} updateEntry={updateEntry} removeEntry={removeEntry} close={() => setEditEntry(null)} say={say} />}
       {mealSum && <MealSummary T={T} meal={MEALS.find((m) => m.key === mealSum)} items={day.meals[mealSum] || []} dayCal={totals.cal} settings={settings} gramTargets={gramTargets} date={date} close={() => setMealSum(null)} />}
       {mealMenu && (() => {
@@ -1507,7 +1507,7 @@ function DietTab({ T, S, settings, persistSettings, dayTags, fridge, addFridgeIt
   </>);
 }
 
-function TagEditor({ T, food, setFoodTags, patchFood, openRecipeEdit, openRecipeCopy, close, say }) {
+function TagEditor({ T, food, foods, setFoodTags, patchFood, openRecipeEdit, openRecipeCopy, close, say }) {
   const [name, setName] = useState(food.name);
   const [serving, setServing] = useState(food.serving || "1 serving");
   const origG = servG(food);
@@ -1580,10 +1580,14 @@ function TagEditor({ T, food, setFoodTags, patchFood, openRecipeEdit, openRecipe
         </div>
       </div>
       {food.recipe ? <>
-        {food.recipe.items.map((it, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "5px 0", borderBottom: i < food.recipe.items.length - 1 ? `1px solid ${T.border}` : "none" }}>
-          <span style={{ color: T.sub }}>{it.name}</span>
-          <span style={{ fontWeight: 600 }}>{rnd(it.qty, 2)}×</span>
-        </div>))}
+        {food.recipe.items.map((it, i) => {
+          const ing = (foods || []).find((x) => x.id === it.foodId);
+          const u = ing ? servUnit(ing) : null;
+          return (<div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "5px 0", borderBottom: i < food.recipe.items.length - 1 ? `1px solid ${T.border}` : "none" }}>
+            <span style={{ color: T.sub }}>{it.name}</span>
+            <span style={{ fontWeight: 600 }}>{u ? `${rnd(it.qty * u.amt)} ${u.unit}` : `${rnd(it.qty, 2)} srv`}</span>
+          </div>);
+        })}
         <div style={{ fontSize: 11, color: T.mut, marginTop: 6 }}>Makes {food.recipe.servings} serving{food.recipe.servings === 1 ? "" : "s"} · nutrition shown per serving</div>
       </> : <div style={{ fontSize: 11.5, color: T.mut, marginTop: 6 }}>Built before ingredient tracking — recreate it once via + Recipe to enable viewing and editing.</div>}
     </div>}
@@ -1872,26 +1876,8 @@ function QuickFood({ T, addFoodToLib, close, say }) {
   </div>);
 }
 
-function AmountPicker({ T, value, onPick, close }) {
-  const [v, setV] = useState(String(value));
-  const commit = (x) => { const n = +x; if (n > 0) onPick(rnd(n, 2)); close(); };
-  return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 65, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={close}>
-    <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 300, background: T.bg, borderRadius: 16, padding: 14 }}>
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Amount</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {[0.25, 0.5, 0.75, 1, 1.5, 2, 3].map((n) => (
-          <button key={n} onClick={() => commit(n)} style={{ ...pill(T), flex: "1 1 22%", padding: "9px 4px", fontSize: 13, background: +v === n ? T.mintSoft : T.cardAlt, color: +v === n ? T.mint : T.text, borderColor: +v === n ? T.mint : T.border }}>{n}×</button>))}
-      </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-        <input type="number" inputMode="decimal" step="any" min="0" autoFocus value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => e.key === "Enter" && commit(v)} style={{ ...inp(T), textAlign: "center", fontWeight: 700 }} />
-        <button onClick={() => commit(v)} style={{ ...pill(T), background: T.mint, color: "#fff", borderColor: T.mint, flexShrink: 0 }}>Done</button>
-      </div>
-    </div>
-  </div>);
-}
-
 function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFoodTags, close, say }) {
-  const [picker, setPicker] = useState(null);
+  const [drafts, setDrafts] = useState({});
   const [name, setName] = useState(editing ? (copy ? editing.name + " (copy)" : editing.name) : "");
   const [servings, setServings] = useState(editing?.recipe?.servings || 1);
   const [items, setItems] = useState(editing?.recipe?.items ? editing.recipe.items.map((x) => ({ ...x })) : []);
@@ -1955,13 +1941,30 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
         <span style={{ fontSize: 13, color: T.sub }}>serving{servings > 1 ? "s" : ""}</span>
       </div>
       <input placeholder="Search ingredients from your library…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inp(T), marginTop: 12 }} />
-      {opts.map((f) => (<button key={f.id} onClick={() => { setItems([...items, { foodId: f.id, name: f.name, qty: 1 }]); setQ(""); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 4px", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, color: T.text, fontSize: 13, cursor: "pointer" }}>+ {f.name} <span style={{ color: T.mut }}>({f.serving}, {fmtN(f.cal)} kcal)</span></button>))}
-      {items.map((it, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-        <span style={{ flex: 1, fontSize: 13, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</span>
-        <button onClick={() => setPicker(i)} style={{ ...pill(T), padding: "6px 12px", fontSize: 13, fontWeight: 700 }}>{rnd(it.qty, 2)}×</button>
-        <button onClick={() => setItems(items.filter((_, j) => j !== i))} style={{ ...btn(T), color: T.mut }}>✕</button>
-      </div>))}
-      {picker != null && <AmountPicker T={T} value={items[picker].qty} onPick={(n) => setItems(items.map((x, j) => (j === picker ? { ...x, qty: n } : x)))} close={() => setPicker(null)} />}
+      {opts.map((f) => (<button key={f.id} onClick={() => { setItems([...items, { foodId: f.id, name: f.name, qty: 1 }]); setDrafts({}); setQ(""); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 4px", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, color: T.text, fontSize: 13, cursor: "pointer" }}>+ {f.name} <span style={{ color: T.mut }}>({f.serving}, {fmtN(f.cal)} kcal)</span></button>))}
+      {items.map((it, i) => {
+        const f = foods.find((x) => x.id === it.foodId);
+        const u = f ? servUnit(f) : null;
+        const shown = drafts[i] != null ? drafts[i] : String(u ? rnd(it.qty * u.amt) : rnd(it.qty, 2));
+        const commit = (txt) => {
+          setDrafts((d) => ({ ...d, [i]: txt }));
+          const v = +txt;
+          if (v > 0) setItems(items.map((x, j) => (j === i ? { ...x, qty: rnd(u ? v / u.amt : v, 4) } : x)));
+        };
+        return (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
+            <div style={{ fontSize: 10.5, color: T.mut }}>{f ? `${fmtN(f.cal * it.qty)} kcal` : "not in library"}{u ? ` · 1 serving = ${u.amt}${u.unit}` : ""}</div>
+          </div>
+          <input type="number" inputMode="decimal" step="any" min="0" value={shown}
+            onFocus={(e) => { setDrafts((d) => ({ ...d, [i]: shown })); e.target.select(); }}
+            onChange={(e) => commit(e.target.value)}
+            onBlur={() => setDrafts((d) => { const n = { ...d }; delete n[i]; return n; })}
+            style={{ ...inp(T), width: 78, textAlign: "center", fontWeight: 700, padding: "8px 4px" }} />
+          <span style={{ fontSize: 12, color: T.sub, minWidth: 26 }}>{u ? u.unit : "srv"}</span>
+          <button onClick={() => { setItems(items.filter((_, j) => j !== i)); setDrafts({}); }} style={{ ...btn(T), color: T.mut }}>✕</button>
+        </div>);
+      })}
       {items.length > 0 && <div style={{ marginTop: 12, fontSize: 13, color: T.sub }}>Per serving: <b style={{ color: T.mint }}>{fmtN(tot.cal / servings)} kcal</b> · P{Math.round(tot.p / servings)} C{Math.round(tot.c / servings)} F{Math.round(tot.f / servings)} · fiber {rnd(tot.fiber / servings, 1)}g</div>}
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         <button onClick={close} style={{ ...pill(T), flex: 1 }}>Cancel</button>
