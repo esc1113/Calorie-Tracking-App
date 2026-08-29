@@ -1928,9 +1928,9 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
     close();
   };
 
-  return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={close}>
-    <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, height: "92dvh", background: T.card, borderRadius: "20px 20px 0 0", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px 10px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+  return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 50, display: "flex", alignItems: "flex-start", justifyContent: "center" }} onClick={close}>
+    <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, height: "100dvh", background: T.card, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "calc(env(safe-area-inset-top) + 12px) 16px 10px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
         <button onClick={close} style={{ ...pill(T), padding: "6px 12px", flexShrink: 0 }}>✕</button>
         <span style={{ fontWeight: 700, fontSize: 16, flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{copy ? "Duplicate recipe" : isEdit ? "Edit recipe" : "New recipe from ingredients"}</span>
       </div>
