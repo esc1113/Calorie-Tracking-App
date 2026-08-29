@@ -9,7 +9,7 @@ deployed minified bundle survived. Recovered so far, verified, and now versioned
   aggregation + tagging functions re-expressed from the compiled bodies and behavior-tested
   (exclusions: fried/juice/cottage/egg-white; kimchi dual-count; potato produce-zeroing; caps).
 - `app.v1.jsx` — the original session-1 UI (recovered from build transcripts), kept as reference.
-- `app.jsx` (current, v4.x) — reconstruction from the beautified deployed bundle in progress.
+- `app.jsx` (current, v4.1) — reconstruction COMPLETE and deployed; verified by string-literal diff against the previous bundle.
 
 From now on `src/` lives in this repo. GitHub Pages ignores it; deploys still ship only
 `app.js` + `sw.js`.
