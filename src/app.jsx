@@ -1929,9 +1929,13 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
   };
 
   return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={close}>
-    <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, maxHeight: "88dvh", overflowY: "auto", background: T.card, borderRadius: "20px 20px 0 0", padding: "16px 16px calc(env(safe-area-inset-bottom) + 16px)" }}>
-      <div style={{ fontWeight: 700, fontSize: 16 }}>{copy ? "Duplicate recipe" : isEdit ? "Edit recipe" : "New recipe from ingredients"}</div>
-      {copy && <div style={{ fontSize: 11.5, color: T.sub, marginTop: 4 }}>Saving creates a new recipe — the original stays untouched.</div>}
+    <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, height: "92dvh", background: T.card, borderRadius: "20px 20px 0 0", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px 10px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+        <button onClick={close} style={{ ...pill(T), padding: "6px 12px", flexShrink: 0 }}>✕</button>
+        <span style={{ fontWeight: 700, fontSize: 16, flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{copy ? "Duplicate recipe" : isEdit ? "Edit recipe" : "New recipe from ingredients"}</span>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", padding: "0 16px 16px" }}>
+      {copy && <div style={{ fontSize: 11.5, color: T.sub, marginTop: 10 }}>Saving creates a new recipe — the original stays untouched.</div>}
       <input placeholder="Recipe name (e.g. Protein Creami)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp(T), marginTop: 10 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
         <span style={{ fontSize: 13, color: T.sub }}>Makes</span>
@@ -1966,9 +1970,9 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
         </div>);
       })}
       {items.length > 0 && <div style={{ marginTop: 12, fontSize: 13, color: T.sub }}>Per serving: <b style={{ color: T.mint }}>{fmtN(tot.cal / servings)} kcal</b> · P{Math.round(tot.p / servings)} C{Math.round(tot.c / servings)} F{Math.round(tot.f / servings)} · fiber {rnd(tot.fiber / servings, 1)}g</div>}
-      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-        <button onClick={close} style={{ ...pill(T), flex: 1 }}>Cancel</button>
-        <button onClick={save} style={{ ...pill(T), flex: 2, background: T.mint, color: "#fff", borderColor: T.mint }}>{copy ? "Save copy" : isEdit ? "Save changes" : "Save recipe"}</button>
+      </div>
+      <div style={{ display: "flex", gap: 8, padding: "10px 16px calc(env(safe-area-inset-bottom) + 12px)", borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
+        <button onClick={save} style={{ ...pill(T), flex: 1, background: T.mint, color: "#fff", borderColor: T.mint, padding: "12px" }}>{copy ? "Save copy" : isEdit ? "Save changes" : "Save recipe"}</button>
       </div>
     </div>
   </div>);
