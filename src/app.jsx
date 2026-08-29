@@ -1949,24 +1949,29 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
       {items.map((it, i) => {
         const f = foods.find((x) => x.id === it.foodId);
         const u = f ? servUnit(f) : null;
-        const shown = drafts[i] != null ? drafts[i] : String(u ? rnd(it.qty * u.amt) : rnd(it.qty, 2));
+        const shown = drafts[i] != null ? drafts[i] : String(u ? rnd(it.qty * u.amt, 2) : rnd(it.qty, 2));
         const commit = (txt) => {
           setDrafts((d) => ({ ...d, [i]: txt }));
           const v = +txt;
           if (v > 0) setItems(items.map((x, j) => (j === i ? { ...x, qty: rnd(u ? v / u.amt : v, 4) } : x)));
         };
-        return (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+        return (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${T.border}` }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
-            <div style={{ fontSize: 10.5, color: T.mut }}>{f ? `${fmtN(f.cal * it.qty)} kcal` : "not in library"}{u ? ` · 1 serving = ${u.amt}${u.unit}` : ""}</div>
+            <div style={{ fontSize: 13.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <input type="number" inputMode="decimal" step="any" min="0" value={shown}
+                onFocus={(e) => { setDrafts((d) => ({ ...d, [i]: shown })); e.target.select(); }}
+                onChange={(e) => commit(e.target.value)}
+                onBlur={() => setDrafts((d) => { const n = { ...d }; delete n[i]; return n; })}
+                style={{ ...inp(T), width: 66, textAlign: "center", fontWeight: 700, padding: "5px 4px", fontSize: 14 }} />
+              <span style={{ fontSize: 11.5, color: T.mut, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u ? u.unit : `× ${f ? f.serving : "serving"}`}</span>
+            </div>
           </div>
-          <input type="number" inputMode="decimal" step="any" min="0" value={shown}
-            onFocus={(e) => { setDrafts((d) => ({ ...d, [i]: shown })); e.target.select(); }}
-            onChange={(e) => commit(e.target.value)}
-            onBlur={() => setDrafts((d) => { const n = { ...d }; delete n[i]; return n; })}
-            style={{ ...inp(T), width: 78, textAlign: "center", fontWeight: 700, padding: "8px 4px" }} />
-          <span style={{ fontSize: 12, color: T.sub, minWidth: 26 }}>{u ? u.unit : "srv"}</span>
-          <button onClick={() => { setItems(items.filter((_, j) => j !== i)); setDrafts({}); }} style={{ ...btn(T), color: T.mut }}>✕</button>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 700, color: T.mint }}>{f ? fmtN(f.cal * it.qty) : "—"}</div>
+            <div style={{ fontSize: 9.5, color: T.mut, marginTop: 1 }}>cal</div>
+          </div>
+          <button onClick={() => { setItems(items.filter((_, j) => j !== i)); setDrafts({}); }} style={{ ...btn(T), color: T.mut, flexShrink: 0 }}>✕</button>
         </div>);
       })}
       {items.length > 0 && <div style={{ marginTop: 12, fontSize: 13, color: T.sub }}>Per serving: <b style={{ color: T.mint }}>{fmtN(tot.cal / servings)} kcal</b> · P{Math.round(tot.p / servings)} C{Math.round(tot.c / servings)} F{Math.round(tot.f / servings)} · fiber {rnd(tot.fiber / servings, 1)}g</div>}
