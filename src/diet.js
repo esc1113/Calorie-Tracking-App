@@ -1,9 +1,59 @@
 // diet.js — weekly/daily nutrition-target engine (restored from the deployed v4.0 bundle)
 
 export const GROUPS = {
+            fatty_fish: {
                 label: "Fatty fish",
                 emoji: "\u{1F41F}"
-            };
+            },
+            legumes: {
+                label: "Legumes",
+                emoji: "\u{1FAD8}"
+            },
+            cruciferous: {
+                label: "Cruciferous",
+                emoji: "\u{1F966}"
+            },
+            leafy_greens: {
+                label: "Leafy greens",
+                emoji: "\u{1F96C}"
+            },
+            nuts_seeds: {
+                label: "Nuts & seeds",
+                emoji: "\u{1F330}"
+            },
+            berries: {
+                label: "Berries",
+                emoji: "\u{1FAD0}"
+            },
+            red_meat: {
+                label: "Red meat",
+                emoji: "\u{1F969}"
+            },
+            fruit: {
+                label: "Fruit",
+                emoji: "\u{1F34E}"
+            },
+            veg: {
+                label: "Vegetables",
+                emoji: "\u{1F955}"
+            },
+            orange_red: {
+                label: "Orange/red veg",
+                emoji: "\u{1FAD1}"
+            },
+            whole_grains: {
+                label: "Whole grains",
+                emoji: "\u{1F33E}"
+            },
+            fermented: {
+                label: "Fermented",
+                emoji: "\u{1F963}"
+            },
+            eggs: {
+                label: "Eggs",
+                emoji: "\u{1F95A}"
+            }
+        };
 
 export const WEEKLY_TARGETS = [{
             id: "fatty_fish",
