@@ -1953,7 +1953,7 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
         const commit = (txt) => {
           setDrafts((d) => ({ ...d, [i]: txt }));
           const v = +txt;
-          if (v > 0) setItems(items.map((x, j) => (j === i ? { ...x, qty: rnd(u ? v / u.amt : v, 4) } : x)));
+          if (v > 0) setItems(items.map((x, j) => (j === i ? { ...x, qty: u ? v / u.amt : v } : x)));
         };
         return (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${T.border}` }}>
           <div style={{ flex: 1, minWidth: 0 }}>
