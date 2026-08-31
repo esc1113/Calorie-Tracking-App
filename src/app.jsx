@@ -1878,20 +1878,30 @@ function QuickFood({ T, addFoodToLib, close, say }) {
 
 function IngredientAdd({ T, food, onAdd, close }) {
   const u = servUnit(food);
-  const [v, setV] = useState(String(u ? u.amt : 1));
-  const qty = u ? (+v || 0) / u.amt : (+v || 0);
-  const commit = () => { if (+v > 0) onAdd(u ? +v / u.amt : +v); };
+  const [qty, setQty] = useState(1);
+  const [aTxt, setATxt] = useState(u ? String(u.amt) : "1");
+  const [sTxt, setSTxt] = useState("1");
+  const onAmt = (t) => { setATxt(t); const n = +t; if (n > 0) { setQty(n / u.amt); setSTxt(String(rnd(n / u.amt, 2))); } };
+  const onSrv = (t) => { setSTxt(t); const n = +t; if (n > 0) { setQty(n); if (u) setATxt(String(rnd(n * u.amt, 2))); } };
+  const commit = () => { if (qty > 0) onAdd(qty); };
   return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 65, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "16dvh" }} onClick={close}>
     <div onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 48px)", maxWidth: 320, background: T.bg, borderRadius: 16, padding: 14 }}>
       <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 2 }}>1 serving = {food.serving}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
-        <input type="number" inputMode="decimal" step="any" min="0" autoFocus value={v}
-          onFocus={(e) => e.target.select()}
-          onChange={(e) => setV(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && commit()}
-          style={{ ...inp(T), textAlign: "center", fontWeight: 700, fontSize: 17 }} />
-        <span style={{ fontSize: 13, color: T.sub, flexShrink: 0, maxWidth: 120, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u ? u.unit : `× ${food.serving}`}</span>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginTop: 12 }}>
+        {u && <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10.5, color: T.mut, marginBottom: 3 }}>{u.unit}</div>
+          <input type="number" inputMode="decimal" step="any" min="0" autoFocus value={aTxt}
+            onFocus={(e) => e.target.select()} onChange={(e) => onAmt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && commit()}
+            style={{ ...inp(T), textAlign: "center", fontWeight: 700, fontSize: 17 }} />
+        </div>}
+        {u && <span style={{ fontSize: 14, color: T.mut, paddingBottom: 12 }}>=</span>}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10.5, color: T.mut, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>servings{u ? "" : ` (${food.serving})`}</div>
+          <input type="number" inputMode="decimal" step="any" min="0" autoFocus={!u} value={sTxt}
+            onFocus={(e) => e.target.select()} onChange={(e) => onSrv(e.target.value)} onKeyDown={(e) => e.key === "Enter" && commit()}
+            style={{ ...inp(T), textAlign: "center", fontWeight: 700, fontSize: 17 }} />
+        </div>
       </div>
       <div style={{ fontSize: 12, color: T.sub, marginTop: 8, textAlign: "center" }}>= <b style={{ color: T.mint }}>{fmtN(food.cal * qty)}</b> cal · P{rnd(food.p * qty, 1)} C{rnd(food.c * qty, 1)} F{rnd(food.f * qty, 1)}</div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -1905,6 +1915,7 @@ function IngredientAdd({ T, food, onAdd, close }) {
 function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFoodTags, close, say }) {
   const [drafts, setDrafts] = useState({});
   const [adding, setAdding] = useState(null);
+  const [rowMode, setRowMode] = useState({});
   const [name, setName] = useState(editing ? (copy ? editing.name + " (copy)" : editing.name) : "");
   const [servings, setServings] = useState(editing?.recipe?.servings || 1);
   const [items, setItems] = useState(editing?.recipe?.items ? editing.recipe.items.map((x) => ({ ...x })) : []);
@@ -1976,12 +1987,14 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
       {items.map((it, i) => {
         const f = foods.find((x) => x.id === it.foodId);
         const u = f ? servUnit(f) : null;
-        const shown = drafts[i] != null ? drafts[i] : String(u ? rnd(it.qty * u.amt, 2) : rnd(it.qty, 2));
+        const mode = u && rowMode[i] !== "srv" ? "unit" : "srv";
+        const shown = drafts[i] != null ? drafts[i] : String(mode === "unit" ? rnd(it.qty * u.amt, 2) : rnd(it.qty, 2));
         const commit = (txt) => {
           setDrafts((d) => ({ ...d, [i]: txt }));
           const v = +txt;
-          if (v > 0) setItems(items.map((x, j) => (j === i ? { ...x, qty: u ? v / u.amt : v } : x)));
+          if (v > 0) setItems(items.map((x, j) => (j === i ? { ...x, qty: mode === "unit" ? v / u.amt : v } : x)));
         };
+        const flip = () => { setDrafts((d) => { const n = { ...d }; delete n[i]; return n; }); setRowMode((m) => ({ ...m, [i]: mode === "unit" ? "srv" : "unit" })); };
         return (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${T.border}` }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
@@ -1991,7 +2004,9 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
                 onChange={(e) => commit(e.target.value)}
                 onBlur={() => setDrafts((d) => { const n = { ...d }; delete n[i]; return n; })}
                 style={{ ...inp(T), width: 66, textAlign: "center", fontWeight: 700, padding: "5px 4px", fontSize: 14 }} />
-              <span style={{ fontSize: 11.5, color: T.mut, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u ? u.unit : `× ${f ? f.serving : "serving"}`}</span>
+              {u ? <button onClick={flip} style={{ background: "none", border: `1px dashed ${T.border}`, borderRadius: 8, padding: "3px 7px", cursor: "pointer", color: T.sub, fontSize: 11.5, whiteSpace: "nowrap" }}>{mode === "unit" ? u.unit : "srv"} ⇄</button>
+                : <span style={{ fontSize: 11.5, color: T.mut, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>× {f ? f.serving : "serving"}</span>}
+              {u && <span style={{ fontSize: 10.5, color: T.mut, whiteSpace: "nowrap" }}>= {mode === "unit" ? `${rnd(it.qty, 2)} srv` : `${rnd(it.qty * u.amt, 2)} ${u.unit}`}</span>}
             </div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
