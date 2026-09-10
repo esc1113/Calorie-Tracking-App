@@ -1889,19 +1889,19 @@ function IngredientAdd({ T, food, onAdd, close }) {
       <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 2 }}>1 serving = {food.serving}</div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginTop: 12 }}>
-        {u && <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, color: T.mut, marginBottom: 3 }}>{u.unit}</div>
-          <input type="number" inputMode="decimal" step="any" min="0" autoFocus value={aTxt}
-            onFocus={(e) => e.target.select()} onChange={(e) => onAmt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && commit()}
-            style={{ ...inp(T), textAlign: "center", fontWeight: 700, fontSize: 17 }} />
-        </div>}
-        {u && <span style={{ fontSize: 14, color: T.mut, paddingBottom: 12 }}>=</span>}
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10.5, color: T.mut, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>servings{u ? "" : ` (${food.serving})`}</div>
-          <input type="number" inputMode="decimal" step="any" min="0" autoFocus={!u} value={sTxt}
+          <input type="number" inputMode="decimal" step="any" min="0" autoFocus value={sTxt}
             onFocus={(e) => e.target.select()} onChange={(e) => onSrv(e.target.value)} onKeyDown={(e) => e.key === "Enter" && commit()}
             style={{ ...inp(T), textAlign: "center", fontWeight: 700, fontSize: 17 }} />
         </div>
+        {u && <span style={{ fontSize: 14, color: T.mut, paddingBottom: 12 }}>=</span>}
+        {u && <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10.5, color: T.mut, marginBottom: 3 }}>{u.unit}</div>
+          <input type="number" inputMode="decimal" step="any" min="0" value={aTxt}
+            onFocus={(e) => e.target.select()} onChange={(e) => onAmt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && commit()}
+            style={{ ...inp(T), textAlign: "center", fontWeight: 700, fontSize: 17 }} />
+        </div>}
       </div>
       <div style={{ fontSize: 12, color: T.sub, marginTop: 8, textAlign: "center" }}>= <b style={{ color: T.mint }}>{fmtN(food.cal * qty)}</b> cal · P{rnd(food.p * qty, 1)} C{rnd(food.c * qty, 1)} F{rnd(food.f * qty, 1)}</div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
