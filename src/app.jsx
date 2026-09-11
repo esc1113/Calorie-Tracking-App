@@ -405,13 +405,29 @@ export default function App() {
     stepsParamDone.current = true;
     try {
       const u = new URL(window.location.href);
-      const n = Math.round(+u.searchParams.get("steps"));
+      let dirty = false;
+      const n = Math.round(+String(u.searchParams.get("steps") || "").replace(/[^\d.]/g, ""));
       if (n > 0 && n < 200000) {
         const dp = u.searchParams.get("date") || "";
         const d = /^\d{4}-\d{2}-\d{2}$/.test(dp) ? dp : todayStr();
         setSteps(d, n);
         say(`👟 ${fmtN(n)} steps synced${d === todayStr() ? "" : " · " + shortDate(d)}`);
-        u.searchParams.delete("steps"); u.searchParams.delete("date");
+        dirty = true;
+      }
+      const sync = u.searchParams.get("stepsync");
+      if (sync) {
+        let count = 0;
+        sync.split(/[;,\s]+(?=\d{4}-\d{2}-\d{2})/).forEach((seg) => {
+          const m = seg.match(/(\d{4}-\d{2}-\d{2})\D*?([\d,.]+)/);
+          if (!m) return;
+          const v = Math.round(parseFloat(m[2].replace(/,/g, "")));
+          if (v > 0 && v < 200000 && m[1] <= todayStr()) { setSteps(m[1], v); count++; }
+        });
+        if (count) say(`👟 Steps synced · ${count} day${count === 1 ? "" : "s"}`);
+        dirty = true;
+      }
+      if (dirty) {
+        ["steps", "date", "stepsync"].forEach((k) => u.searchParams.delete(k));
         window.history.replaceState({}, "", u.pathname + (u.searchParams.toString() ? "?" + u.searchParams.toString() : ""));
       }
     } catch {}
