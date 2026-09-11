@@ -315,6 +315,20 @@ function stepsTdeeFit(logCals, weightsMap, stepsMap) {
   return { ok: true, per1k: Math.round(per1k), base: Math.round(base), n: pts.length };
 }
 
+function stepsAdjModel(logCals, weightsMap, stepsMap, tdee) {
+  if (!tdee.ok) return { ok: false };
+  const today = todayStr();
+  const vals = [];
+  for (let i = 1; i <= 21; i++) { const v = stepsMap[addDays(today, -i)]; if (v > 0) vals.push(v); }
+  if (vals.length < 7) return { ok: false };
+  const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  const fit = stepsTdeeFit(logCals, weightsMap, stepsMap);
+  const sorted = Object.keys(weightsMap).sort();
+  const trendW = sorted.length ? weightsMap[sorted[sorted.length - 1]] : 150;
+  const m1k = fit.ok ? fit.per1k : Math.max(25, Math.round(0.28 * trendW));
+  return { ok: true, m1k, src: fit.ok ? "fit" : "est", avg, adj: (n) => Math.round(tdee.tdee + (m1k / 1000) * (n - avg)) };
+}
+
 function Bar({ pct, color, bg, h = 6 }) {
   return (<div style={{ height: h, background: bg, borderRadius: h / 2, overflow: "hidden" }}>
     <div style={{ width: `${Math.min(100, Math.max(0, pct))}%`, height: h, background: color, borderRadius: h / 2, transition: "width .3s" }} />
@@ -1830,6 +1844,21 @@ function Trends({ T, S, logCals, settings, weightsMap, setWeight, delWeight, ste
         <div style={{ background: T.mintSoft, borderRadius: 12, padding: "10px 12px", marginTop: 10, fontSize: 13, color: T.text }}>
           → eat about <b style={{ color: T.mint }}>{fmtN(suggested)} kcal/day</b> for −{settings.rate} lb/wk{wksToGoal > 0 && <span style={{ color: T.sub }}> · ~{wksToGoal} wks to {settings.goalW} lb</span>}
         </div>
+        {(() => {
+          const am = stepsAdjModel(logCals, weightsMap, stepsMap, tdee);
+          if (!am.ok) return null;
+          const y = addDays(todayStr(), -1);
+          const sy = stepsMap[y] || 0;
+          const st = stepsMap[todayStr()] || 0;
+          return (<div style={{ marginTop: 10, borderTop: `1px solid ${T.border}`, paddingTop: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700 }}>Activity-adjusted burn</div>
+            <div style={{ fontSize: 11.5, color: T.sub, marginTop: 3 }}>≈ {fmtN(tdee.tdee)} ± <b style={{ color: T.text }}>{am.m1k}</b> kcal per 1,000 steps above/below your <b style={{ color: T.text }}>{fmtN(am.avg)}</b>-step average</div>
+            <div style={{ fontSize: 10.5, color: T.mut, marginTop: 2 }}>{am.src === "fit" ? "rate fitted from your own weeks of data" : "rate estimated from body weight — switches to your personal fit as weeks accrue"}</div>
+            {sy > 0 && <div style={{ fontSize: 12.5, marginTop: 7 }}>Yesterday · {fmtN(sy)} steps → <b style={{ color: T.mint }}>~{fmtN(am.adj(sy))} kcal</b> <span style={{ fontSize: 11, color: sy >= am.avg ? T.green : T.amber }}>({sy >= am.avg ? "+" : "−"}{fmtN(Math.abs(am.adj(sy) - tdee.tdee))} vs usual)</span></div>}
+            {st > 0 && <div style={{ fontSize: 11.5, color: T.sub, marginTop: 3 }}>Today so far · {fmtN(st)} steps → tracking ~{fmtN(am.adj(st))} <span style={{ color: T.mut }}>(partial day)</span></div>}
+            <div style={{ fontSize: 10, color: T.mut, marginTop: 7 }}>Info only — your intake goal stays fixed; a big-step day just means that much more real headroom.</div>
+          </div>);
+        })()}
       </> : <div style={{ fontSize: 13, color: T.sub, marginTop: 6 }}>{tdee.why}. Log food daily and weigh in each morning — the estimate appears automatically.</div>}
     </div>
   </>);
