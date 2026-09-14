@@ -466,7 +466,10 @@ export default function App() {
           if (!f) { missing.push(ing.match || ing.name); return; }
           const ui = servUnit(f);
           let qty = +ing.srv > 0 ? +ing.srv : null;
-          if (qty == null && +ing.amt > 0) qty = ui ? +ing.amt / ui.amt : +ing.amt;
+          if (qty == null && +ing.amt > 0) {
+            if (!ui) { missing.push(`${ing.match || ing.name} (set g/serving in its editor first)`); return; }
+            qty = +ing.amt / ui.amt;
+          }
           if (!(qty > 0)) qty = 1;
           items.push({ foodId: f.id, name: f.name, qty });
         });
