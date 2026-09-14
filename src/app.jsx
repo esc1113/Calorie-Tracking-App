@@ -389,7 +389,7 @@ export default function App() {
   const [mealMenu, setMealMenu] = useState(null);
 
   const T = THEMES[settings.theme];
-  const say = (m) => { setToast(m); setTimeout(() => setToast(null), 2200); };
+  const say = (m, ms = 2200) => { setToast(m); setTimeout(() => setToast(null), ms); };
   const mainRef = () => doc(db, "fuel_users", user.uid);
 
   const [macroView, setMacroView] = useState(() => { try { return localStorage.getItem("fuel_macroview") || "goal"; } catch { return "goal"; } });
@@ -446,6 +446,57 @@ export default function App() {
       }
     } catch {}
   }, [user]);
+
+  const recipesParamDone = useRef(false);
+  useEffect(() => {
+    if (!ready || recipesParamDone.current) return;
+    recipesParamDone.current = true;
+    try {
+      const u = new URL(window.location.href);
+      const raw = u.searchParams.get("recipes");
+      if (!raw) return;
+      const specs = JSON.parse(raw);
+      const okNames = [], missAll = [];
+      (Array.isArray(specs) ? specs : [specs]).forEach((sp) => {
+        const servings = Math.max(1, Math.round(sp.servings || 1));
+        const items = [], missing = [];
+        (sp.items || []).forEach((ing) => {
+          const nm = String(ing.match || ing.name || "").toLowerCase();
+          const f = foods.find((x) => x.name.toLowerCase() === nm) || foods.find((x) => x.name.toLowerCase().includes(nm)) || foods.find((x) => nm.includes(x.name.toLowerCase()));
+          if (!f) { missing.push(ing.match || ing.name); return; }
+          const ui = servUnit(f);
+          let qty = +ing.srv > 0 ? +ing.srv : null;
+          if (qty == null && +ing.amt > 0) qty = ui ? +ing.amt / ui.amt : +ing.amt;
+          if (!(qty > 0)) qty = 1;
+          items.push({ foodId: f.id, name: f.name, qty });
+        });
+        missAll.push(...missing);
+        if (!items.length) return;
+        const micros = M0(); const gAgg = {};
+        let fiber = 0, pgSum = 0, cal = 0, p = 0, c = 0, fx = 0, sugarSum = 0, sugarAny = false, satSum = 0, satAny = false;
+        items.forEach((it) => {
+          const f = foods.find((x) => x.id === it.foodId);
+          cal += f.cal * it.qty; p += f.p * it.qty; c += f.c * it.qty; fx += f.f * it.qty; fiber += (f.fiber || 0) * it.qty;
+          Object.keys(micros).forEach((k) => (micros[k] += (f.micros?.[k] || 0) * it.qty));
+          if (f.sugar != null) { sugarAny = true; sugarSum += f.sugar * it.qty; }
+          if (f.satfat != null) { satAny = true; satSum += f.satfat * it.qty; }
+          const ft = ensureTags(f);
+          Object.keys(ft.g || {}).forEach((k) => (gAgg[k] = (gAgg[k] || 0) + ft.g[k] * it.qty));
+          pgSum += (ft.pg || 0) * it.qty;
+        });
+        Object.keys(micros).forEach((k) => (micros[k] = rnd(micros[k] / servings, 1)));
+        const tags = { g: Object.fromEntries(Object.entries(gAgg).map(([k, v]) => [k, rnd(v / servings, 2)]).filter(([, v]) => v > 0)), pg: Math.round(pgSum / servings), pl: null, fv: null };
+        const basics = { name: String(sp.name || "Imported recipe"), serving: servings === 1 ? "1 recipe" : `1/${servings} of recipe`, cal: rnd(cal / servings), p: rnd(p / servings, 1), c: rnd(c / servings, 1), f: rnd(fx / servings, 1), fiber: rnd(fiber / servings, 1), sugar: sugarAny ? rnd(sugarSum / servings, 1) : null, satfat: satAny ? rnd(satSum / servings, 1) : null, micros, recipe: { items, servings } };
+        const existing = foods.find((x) => x.kind === "recipe" && x.name.toLowerCase() === basics.name.toLowerCase());
+        if (existing) { patchFood(existing.id, basics); setFoodTags(existing.id, tags); }
+        else { const nf = mkFood({ ...basics, kind: "recipe" }, "recipe"); nf.recipe = basics.recipe; nf.tags = tags; addFoodToLib(nf); }
+        okNames.push(basics.name);
+      });
+      say(`🧾 ${okNames.length} recipe${okNames.length === 1 ? "" : "s"} imported${missAll.length ? ` · couldn't find: ${missAll.join(", ")}` : ""}`, missAll.length ? 7000 : 3500);
+      u.searchParams.delete("recipes");
+      window.history.replaceState({}, "", u.pathname + (u.searchParams.toString() ? "?" + u.searchParams.toString() : ""));
+    } catch (e) { console.error(e); }
+  }, [ready]);
 
   useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
   useEffect(() => {
