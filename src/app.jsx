@@ -385,6 +385,7 @@ export default function App() {
   const [aiBusy, setAiBusy] = useState(false);
   const [editEntry, setEditEntry] = useState(null);
   const [mealSum, setMealSum] = useState(null);
+  const [mealCopy, setMealCopy] = useState(null);
   const [tagFood, setTagFood] = useState(null);
   const [mealMenu, setMealMenu] = useState(null);
 
@@ -621,13 +622,6 @@ export default function App() {
     if (f) setSheet({ meal: autoMeal(), tab: "search", pre: f });
     else { setSheet({ meal: autoMeal(), tab: "search" }); say("Pick it from search"); }
   };
-  const copyMealFromPrev = async (mealKey, label) => {
-    const yd = await getDoc(doc(db, "fuel_users", user.uid, "days", addDays(date, -1)));
-    const src = yd.exists() ? (yd.data().meals?.[mealKey] || []) : [];
-    if (src.length === 0) return say(`Nothing in the previous day's ${label}`);
-    const nd = { ...day, meals: { ...day.meals, [mealKey]: [...day.meals[mealKey], ...src.map((e) => ({ ...e, id: uid() }))] } };
-    saveDay(nd); say(`Copied ${label} from the previous day`);
-  };
   const clearMeal = (mealKey, label) => {
     saveDay({ ...day, meals: { ...day.meals, [mealKey]: [] } });
     say(`${label} cleared`);
@@ -835,6 +829,7 @@ export default function App() {
       {tagFood && <TagEditor T={T} food={tagFood} foods={foods} setFoodTags={setFoodTags} patchFood={patchFood} openRecipeEdit={(f) => { setTagFood(null); setRecipeOpen({ editing: f }); }} openRecipeCopy={(f) => { setTagFood(null); setRecipeOpen({ editing: f, copy: true }); }} close={() => setTagFood(null)} say={say} />}
       {editEntry && <EntryEdit T={T} info={editEntry} foods={foods} updateEntry={updateEntry} removeEntry={removeEntry} close={() => setEditEntry(null)} say={say} />}
       {mealSum && <MealSummary T={T} meal={MEALS.find((m) => m.key === mealSum)} items={day.meals[mealSum] || []} dayCal={totals.cal} settings={settings} gramTargets={gramTargets} date={date} close={() => setMealSum(null)} />}
+      {mealCopy && <MealCopySheet T={T} destMeal={MEALS.find((m) => m.key === mealCopy.meal)} destDate={date} user={user} day={day} saveDay={saveDay} say={say} close={() => setMealCopy(null)} />}
       {mealMenu && (() => {
         const isDay = mealMenu === "day";
         const m = isDay ? null : MEALS.find((x) => x.key === mealMenu);
@@ -845,7 +840,7 @@ export default function App() {
               { label: "🗑 Clear entire day", danger: true, onTap: () => { clearDay(); setMealMenu(null); } },
             ]
           : [
-              { label: `⧉ Copy ${m.label} from ${rel}`, onTap: () => { copyMealFromPrev(m.key, m.label); setMealMenu(null); } },
+              { label: `📅 Copy ${m.label} from another day…`, onTap: () => { setMealCopy({ meal: m.key }); setMealMenu(null); } },
               { label: `🗑 Clear ${m.label}`, danger: true, onTap: () => { clearMeal(m.key, m.label); setMealMenu(null); } },
             ];
         return <ActionMenu T={T} title={isDay ? fmtDate(date) : `${m.icon} ${m.label}`} actions={actions} close={() => setMealMenu(null)} />;
@@ -1045,6 +1040,60 @@ function MealSummary({ T, meal, items, dayCal, settings, gramTargets, date, clos
     </div>
     <button onClick={() => setNutsOpen(!nutsOpen)} style={{ ...pill(T), width: "100%", marginTop: 10, padding: "9px", fontSize: 12.5 }}>{nutsOpen ? "Hide nutrition facts ▴" : "Nutrition facts ▾"}</button>
     {nutsOpen && <NutritionList T={T} it={{ cal: mt.cal, p: mt.p, c: mt.c, f: mt.f, fiber: mt.fiber, sugar: null, satfat: null, micros: mt.micros }} />}
+  </div></div>);
+}
+
+function MealCopySheet({ T, destMeal, destDate, user, day, saveDay, say, close }) {
+  const [srcDate, setSrcDate] = useState(addDays(destDate, -1));
+  const [srcMeal, setSrcMeal] = useState(destMeal.key);
+  const [srcDay, setSrcDay] = useState(undefined);
+  useEffect(() => {
+    let live = true;
+    setSrcDay(undefined);
+    getDoc(doc(db, "fuel_users", user.uid, "days", srcDate))
+      .then((dd) => { if (live) setSrcDay(dd.exists() ? dd.data() : null); })
+      .catch(() => { if (live) setSrcDay(null); });
+    return () => { live = false; };
+  }, [srcDate]);
+  const items = (srcDay && srcDay.meals && srcDay.meals[srcMeal]) || [];
+  const total = Math.round(items.reduce((a, e) => a + (e.cal || 0), 0));
+  const doCopy = () => {
+    if (!items.length) return;
+    const nd = { ...day, meals: { ...day.meals, [destMeal.key]: [...day.meals[destMeal.key], ...items.map((e) => ({ ...e, id: uid(), time: Date.now() }))] } };
+    saveDay(nd);
+    say(`Copied ${items.length} item${items.length === 1 ? "" : "s"} into ${destMeal.label}`);
+    close();
+  };
+  const ov = { position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" };
+  const sh = { background: T.bg, width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", borderRadius: "18px 18px 0 0", padding: "16px 16px calc(env(safe-area-inset-bottom) + 16px)" };
+  return (<div style={ov} onClick={close}><div style={sh} onClick={(e) => e.stopPropagation()}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 15 }}>Copy into {destMeal.icon} {destMeal.label}</div>
+        <div style={{ fontSize: 11, color: T.mut }}>{fmtDate(destDate)} · pick the day and meal to copy from</div>
+      </div>
+      <button onClick={close} style={{ ...pill(T), padding: "6px 10px" }}>✕</button>
+    </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+      <button onClick={() => setSrcDate(addDays(srcDate, -1))} style={btn(T)}>‹</button>
+      <input type="date" value={srcDate} onChange={(e) => e.target.value && setSrcDate(e.target.value)} style={{ ...inp(T), flex: 1 }} />
+      <button onClick={() => setSrcDate(addDays(srcDate, 1))} style={btn(T)}>›</button>
+    </div>
+    <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
+      {MEALS.map((m) => (<button key={m.key} onClick={() => setSrcMeal(m.key)} style={{ ...pill(T), flex: "1 1 30%", padding: "7px 2px", fontSize: 11.5, background: srcMeal === m.key ? T.mintSoft : T.cardAlt, color: srcMeal === m.key ? T.mint : T.sub, borderColor: srcMeal === m.key ? T.mint : T.border }}>{m.icon} {m.label === "Miscellaneous" ? "Misc" : m.label}</button>))}
+    </div>
+    <div style={{ marginTop: 10, minHeight: 60 }}>
+      {srcDay === undefined && <div style={{ fontSize: 12.5, color: T.mut, padding: "14px 0", textAlign: "center" }}>Loading…</div>}
+      {srcDay !== undefined && items.length === 0 && <div style={{ fontSize: 12.5, color: T.mut, padding: "14px 0", textAlign: "center" }}>Nothing logged in that meal.</div>}
+      {items.map((e) => (<div key={e.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "6px 0", borderBottom: `1px solid ${T.border}` }}>
+        <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: T.sub }}>{e.name}{e.qty !== 1 ? ` ×${rnd(e.qty, 2)}` : ""}</span>
+        <span style={{ fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>{fmtN(e.cal)}</span>
+      </div>))}
+    </div>
+    <button onClick={doCopy} disabled={!items.length} style={{ ...pill(T), width: "100%", marginTop: 12, padding: "12px", background: items.length ? T.mint : T.cardAlt, color: items.length ? "#fff" : T.mut, borderColor: items.length ? T.mint : T.border }}>
+      {items.length ? `Copy ${items.length} item${items.length === 1 ? "" : "s"} · ${fmtN(total)} kcal` : "Copy"}
+    </button>
+    <div style={{ fontSize: 10.5, color: T.mut, marginTop: 8, textAlign: "center" }}>Items land as separate entries — edit or swipe-delete them individually after.</div>
   </div></div>);
 }
 
