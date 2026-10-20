@@ -601,7 +601,7 @@ export default function App() {
   const setFoodTags = (id, tags) => patchFood(id, { tags });
   const deleteFood = (id) => { setFoods((fs) => fs.filter((x) => x.id !== id)); if (user) deleteDoc(doc(db, "fuel_users", user.uid, "foods", id)).catch(console.error); };
   const addIdea = (p) => {
-    const it = { id: uid(), name: String(p.name || "Meal idea"), style: p.style || null, items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name), src: p.src || "manual", added: Date.now() };
+    const it = { id: uid(), name: String(p.name || "Meal idea"), style: p.style || null, items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name), kind: p.kind || null, slot: p.slot || null, src: p.src || "manual", added: Date.now() };
     if (!it.items.length) return;
     setIdeas((m) => ({ ...m, [it.id]: it }));
     if (user) updateDoc(mainRef(), { [`ideas.${it.id}`]: it }).catch(console.error);
@@ -613,7 +613,7 @@ export default function App() {
   const updIdea = (id, p) => {
     const cur = ideas[id];
     if (!cur) return;
-    const it = { ...cur, name: String(p.name || cur.name), style: p.style === undefined ? cur.style : (p.style || null), items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name) };
+    const it = { ...cur, name: String(p.name || cur.name), style: p.style === undefined ? cur.style : (p.style || null), items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name), kind: p.kind || null, slot: p.slot || null };
     if (!it.items.length) return say("An idea needs at least one ingredient");
     setIdeas((m) => ({ ...m, [id]: it }));
     if (user) updateDoc(mainRef(), { [`ideas.${id}`]: it }).catch(console.error);
@@ -937,7 +937,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.8</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.9</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1546,11 +1546,22 @@ async function parseIdeaImage(base64, mediaType) {
   return extractJSON(txt);
 }
 
+function classifyIdea(idea, rows, calEst) {
+  const txt = `${idea.name} ${idea.style || ""} ${rows.map((r) => r.name).join(" ")}`.toLowerCase();
+  const hits = (ws) => ws.reduce((a, w) => a + (txt.includes(w) ? 1 : 0), 0);
+  const sweet = hits(["yogurt", "banana", "honey", "berr", "chocolate", "oat", "peanut butter", "creami", "cinnamon", "apple", "mango", "pineapple", "fruit", "maple", "vanilla", "pudding", "parfait"]);
+  const savory = hits(["chicken", "beef", "turkey", "pork", "salmon", "fish", "shrimp", "egg", "rice", "pasta", "potato", "burger", "taco", "salsa", "marinara", "broccoli", "zucchini", "pickle", "onion", "cheese", "tortilla", "soup"]);
+  const kind = idea.kind || (sweet > savory ? "sweet" : "savory");
+  const bfast = hits(["oat", "yogurt", "toast", "egg", "pancake", "waffle", "cereal", "granola", "smoothie", "parfait", "breakfast", "brunch"]);
+  const slot = idea.slot || (bfast >= 1 ? "breakfast" : (calEst > 0 && calEst < 400) || rows.length <= 2 ? "snack" : "main");
+  return { kind, slot };
+}
+
 function IdeaSaveSheet({ T, editing, onSave, close, say }) {
   const [mode, setMode] = useState("text");
   const [desc, setDesc] = useState("");
   const [busy, setBusy] = useState(false);
-  const [prev, setPrev] = useState(editing ? { name: editing.name, style: editing.style || null, items: (editing.items || []).map((it) => ({ name: it.name, srv: it.srv })) } : null);
+  const [prev, setPrev] = useState(editing ? { name: editing.name, style: editing.style || null, kind: editing.kind || null, slot: editing.slot || null, items: (editing.items || []).map((it) => ({ name: it.name, srv: it.srv })) } : null);
   const [newIng, setNewIng] = useState("");
   const addIng = () => { const n = newIng.trim(); if (!n || !prev) return; setPrev({ ...prev, items: [...prev.items, { name: n, srv: 1 }] }); setNewIng(""); };
   const camRef = useRef();
@@ -1613,6 +1624,16 @@ function IdeaSaveSheet({ T, editing, onSave, close, say }) {
         <input placeholder="Add ingredient (e.g. honey)" value={newIng} onChange={(e) => setNewIng(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addIng()} style={inp(T)} />
         <button onClick={addIng} style={{ ...pill(T), flexShrink: 0 }}>Add</button>
       </div>
+      <div style={{ display: "flex", gap: 5, marginTop: 10, alignItems: "center" }}>
+        <span style={{ fontSize: 11, color: T.mut, width: 32, flexShrink: 0 }}>Type</span>
+        {[[null, "Auto"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
+          <button key={l} onClick={() => setPrev({ ...prev, kind: k })} style={{ ...pill(T), flex: 1, padding: "5px 2px", fontSize: 11, background: (prev.kind || null) === k ? T.mintSoft : T.cardAlt, color: (prev.kind || null) === k ? T.mint : T.sub, borderColor: (prev.kind || null) === k ? T.mint : T.border }}>{l}</button>))}
+      </div>
+      <div style={{ display: "flex", gap: 5, marginTop: 6, alignItems: "center" }}>
+        <span style={{ fontSize: 11, color: T.mut, width: 32, flexShrink: 0 }}>Slot</span>
+        {[[null, "Auto"], ["breakfast", "Bfast"], ["main", "Main"], ["snack", "Snack"]].map(([k, l]) => (
+          <button key={l} onClick={() => setPrev({ ...prev, slot: k })} style={{ ...pill(T), flex: 1, padding: "5px 2px", fontSize: 11, background: (prev.slot || null) === k ? T.mintSoft : T.cardAlt, color: (prev.slot || null) === k ? T.mint : T.sub, borderColor: (prev.slot || null) === k ? T.mint : T.border }}>{l}</button>))}
+      </div>
       <div style={{ fontSize: 10.5, color: T.mut, marginTop: 6 }}>Keep ingredient names generic ("chicken breast", not a brand) — any product in your library that fits will count, and checked ✓ ones win.</div>
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         {!editing && <button onClick={() => setPrev(null)} style={{ ...pill(T), flex: 1 }}>Back</button>}
@@ -1630,12 +1651,33 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
   const lastNames = useRef([]);
   const [saveOpen, setSaveOpen] = useState(false);
   const [editIdea, setEditIdea] = useState(null);
+  const [openIdeas, setOpenIdeas] = useState({});
+  const [ideaFilter, setIdeaFilter] = useState("all");
+  const [ideaSort, setIdeaSort] = useState("ready");
 
   const ideaList = useMemo(() => Object.values(ideas || {}).map((idea) => {
     const rows = (idea.items || []).map((it) => { const f = findFood(foods, it.name); return { ...it, food: f, have: !!(f && f.have) }; });
     const missing = rows.filter((r) => !r.have);
-    return { idea, rows, missing, ready: rows.length > 0 && missing.length === 0 };
-  }).sort((a, b) => (b.ready - a.ready) || ((b.idea.added || 0) - (a.idea.added || 0))), [ideas, foods]);
+    let calEst = 0, partial = false;
+    rows.forEach((r) => { if (r.food) calEst += r.food.cal * (+r.srv > 0 ? +r.srv : 1); else partial = true; });
+    calEst = Math.round(calEst);
+    const { kind, slot } = classifyIdea(idea, rows, calEst);
+    return { idea, rows, missing, ready: rows.length > 0 && missing.length === 0, calEst, partial, kind, slot };
+  }), [ideas, foods]);
+
+  const shownIdeas = useMemo(() => {
+    let L = ideaList;
+    if (ideaFilter === "sweet" || ideaFilter === "savory") L = L.filter((x) => x.kind === ideaFilter);
+    else if (ideaFilter !== "all") L = L.filter((x) => x.slot === ideaFilter);
+    const by = {
+      ready: (a, b) => (b.ready - a.ready) || ((b.idea.added || 0) - (a.idea.added || 0)),
+      "cal-asc": (a, b) => (a.calEst || 1e9) - (b.calEst || 1e9),
+      "cal-desc": (a, b) => (b.calEst || 0) - (a.calEst || 0),
+      new: (a, b) => (b.idea.added || 0) - (a.idea.added || 0),
+      az: (a, b) => a.idea.name.localeCompare(b.idea.name),
+    };
+    return [...L].sort(by[ideaSort] || by.ready);
+  }, [ideaList, ideaFilter, ideaSort]);
 
   const shopList = useMemo(() => {
     const m = {};
@@ -1755,22 +1797,42 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
     {ideaList.length === 0 && <div style={{ ...S.card, marginTop: 8 }}>
       <div style={{ fontSize: 12, color: T.mut }}>See a meal in a video you want to recreate? Save it here — typed or straight from a screenshot — and Fuel tracks when you have everything to make it.</div>
     </div>}
-    {ideaList.map(({ idea, rows, missing, ready }) => (<div key={idea.id} style={{ ...S.card, marginTop: 8, border: `1px solid ${ready ? T.mint : T.border}` }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 13.5, fontWeight: 700, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{idea.name}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {ready ? <span style={{ fontSize: 10.5, fontWeight: 700, color: T.mint, background: T.mintSoft, borderRadius: 8, padding: "3px 8px" }}>Ready</span>
-            : <span style={{ fontSize: 10.5, color: T.amber, fontWeight: 600 }}>{missing.length} short</span>}
-          <button onClick={() => setEditIdea(idea)} style={{ ...btn(T), color: T.mut, minWidth: 26, height: 26 }}>✎</button>
-          <button onClick={() => { delIdea(idea.id); say("Removed"); }} style={{ ...btn(T), color: T.mut, minWidth: 26, height: 26 }}>✕</button>
-        </span>
-      </div>
-      {idea.style && <div style={{ fontSize: 10.5, color: T.mint, marginTop: 1 }}>{idea.style}</div>}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 11.5, marginTop: 6 }}>
-        {rows.map((r, j) => (<span key={j} style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: r.have ? T.sub : T.amber }}>{r.have ? "✓" : "🛒"} {r.food ? r.food.name : r.name}</span>))}
-      </div>
-      {ready && <button onClick={() => logMany(rows.map((r) => ({ food: r.food, qty: +r.srv > 0 ? +r.srv : 1 })), nextSlot)} style={{ ...pill(T), width: "100%", marginTop: 8, padding: "7px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealMeta.label}</button>}
-    </div>))}
+    {ideaList.length > 0 && <div style={{ display: "flex", gap: 5, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+      {[["all", "All"], ["breakfast", "Bfast"], ["main", "Mains"], ["snack", "Snacks"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
+        <button key={k} onClick={() => setIdeaFilter(k)} style={{ ...pill(T), padding: "5px 9px", fontSize: 11, background: ideaFilter === k ? T.mintSoft : T.cardAlt, color: ideaFilter === k ? T.mint : T.sub, borderColor: ideaFilter === k ? T.mint : T.border }}>{l}</button>))}
+      <select value={ideaSort} onChange={(e) => setIdeaSort(e.target.value)} style={{ ...inp(T), width: "auto", padding: "5px 8px", fontSize: 11, marginLeft: "auto" }}>
+        <option value="ready">Ready first</option>
+        <option value="cal-asc">Lightest</option>
+        <option value="cal-desc">Biggest</option>
+        <option value="new">Newest</option>
+        <option value="az">A–Z</option>
+      </select>
+    </div>}
+    {ideaList.length > 0 && shownIdeas.length === 0 && <div style={{ fontSize: 12, color: T.mut, padding: "12px 4px" }}>Nothing in this category yet.</div>}
+    {shownIdeas.map(({ idea, rows, missing, ready, calEst, partial, kind, slot }) => {
+      const open = !!openIdeas[idea.id];
+      return (<div key={idea.id} style={{ ...S.card, marginTop: 8, border: `1px solid ${ready ? T.mint : T.border}` }}>
+        <div onClick={() => setOpenIdeas((m) => ({ ...m, [idea.id]: !m[idea.id] }))} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <span style={{ fontSize: 13.5, fontWeight: 700, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{open ? "▾" : "▸"} {idea.name}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {calEst > 0 && <span style={{ fontSize: 11, color: T.mut }}>~{fmtN(calEst)}{partial ? "+" : ""} cal</span>}
+            {ready ? <span style={{ fontSize: 10.5, fontWeight: 700, color: T.mint, background: T.mintSoft, borderRadius: 8, padding: "3px 8px" }}>Ready</span>
+              : <span style={{ fontSize: 10.5, color: T.amber, fontWeight: 600 }}>{missing.length} short</span>}
+          </span>
+        </div>
+        {open && <>
+          <div style={{ fontSize: 10.5, color: T.mut, marginTop: 3 }}>{idea.style ? `${idea.style} · ` : ""}{kind} · {slot}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 11.5, marginTop: 7 }}>
+            {rows.map((r, j) => (<span key={j} style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: r.have ? T.sub : T.amber }}>{r.have ? "✓" : "🛒"} {r.food ? r.food.name : r.name} <span style={{ color: T.mut }}>×{rnd(r.srv, 2)}</span></span>))}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={() => setEditIdea(idea)} style={{ ...pill(T), flex: 1, padding: "7px", fontSize: 11.5 }}>✎ Edit</button>
+            <button onClick={() => { delIdea(idea.id); say("Removed"); }} style={{ ...pill(T), flex: 1, padding: "7px", fontSize: 11.5, color: T.red, borderColor: T.red, background: "transparent" }}>Remove</button>
+            {ready && <button onClick={() => logMany(rows.map((r) => ({ food: r.food, qty: +r.srv > 0 ? +r.srv : 1 })), nextSlot)} style={{ ...pill(T), flex: 2, padding: "7px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log → {mealMeta.label}</button>}
+          </div>
+        </>}
+      </div>);
+    })}
 
     {shopList.length > 0 && <div style={{ ...S.card, marginTop: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2422,7 +2484,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.8</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.9</div>
     </div>
   </>);
 }
