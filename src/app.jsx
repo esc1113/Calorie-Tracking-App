@@ -91,12 +91,12 @@ const fmtN = (n) => (n == null || isNaN(n) ? "—" : Math.round(n).toLocaleStrin
 const titleCase = (s) => (s || "").toLowerCase().replace(/(^|\s|,)\w/g, (m) => m.toUpperCase());
 const HAS_TOUCH = typeof window !== "undefined" && ("ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0);
 
-async function askClaude(content) {
+async function askClaude(content, maxTokens = 1000) {
   if (!CFG.workerUrl) throw new Error("no-worker");
   const res = await fetch(CFG.workerUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: maxTokens, messages: [{ role: "user", content }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || "API error");
@@ -606,6 +606,13 @@ export default function App() {
     if (collapsed[meal]) toggleCollapse(meal);
     say(`Added to ${MEALS.find((m) => m.key === meal).label}`);
   };
+  const logMany = (pairs, meal) => {
+    const entries = pairs.map(({ food, qty }) => entryFromFood(food, qty));
+    saveDay({ ...day, meals: { ...day.meals, [meal]: [...day.meals[meal], ...entries] } });
+    pairs.forEach(({ food }) => patchFood(food.id, { uses: (food.uses || 0) + 1, lastUsed: Date.now() }));
+    if (collapsed[meal]) toggleCollapse(meal);
+    say(`Added ${entries.length} item${entries.length === 1 ? "" : "s"} to ${MEALS.find((m) => m.key === meal).label}`);
+  };
   const removeEntry = (meal, id) => saveDay({ ...day, meals: { ...day.meals, [meal]: day.meals[meal].filter((e) => e.id !== id) } });
   const updateEntry = (fromMeal, toMeal, entry) => {
     const nd = { ...day, meals: { ...day.meals } };
@@ -805,7 +812,7 @@ export default function App() {
           })}
         </>}
 
-        {tab === "diet" && <DietTab T={T} S={S} settings={settings} persistSettings={persistSettings} dayTags={dayTags} fridge={fridge} addFridgeItem={addFridgeItem} delFridgeItem={delFridgeItem} viewDate={date} user={user} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} openLog={openLog} say={say} />}
+        {tab === "diet" && <DietTab T={T} S={S} settings={settings} persistSettings={persistSettings} dayTags={dayTags} fridge={fridge} addFridgeItem={addFridgeItem} delFridgeItem={delFridgeItem} viewDate={date} user={user} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} logMany={logMany} openLog={openLog} say={say} />}
         {tab === "trends" && <Trends T={T} S={S} logCals={logCals} settings={settings} weightsMap={weightsMap} setWeight={setWeight} delWeight={delWeight} stepsMap={stepsMap} setSteps={setSteps} delSteps={delSteps} tdee={tdee} openDay={openDay} say={say} />}
         {tab === "library" && <Library T={T} S={S} foods={foods} patchFood={patchFood} deleteFood={deleteFood} onLog={(f) => setSheet({ meal: autoMeal(), tab: "search", pre: f })} openEditor={(f) => setTagFood(f)} openRecipe={() => setRecipeOpen({})} openQuick={() => setQuickOpen(true)} say={say} />}
         {tab === "settings" && <Settings T={T} S={S} settings={settings} persistSettings={persistSettings} gramTargets={gramTargets} user={user} say={say} />}
@@ -892,7 +899,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.1</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.5</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1459,7 +1466,80 @@ function GroupDetail({ T, gid, weekDates, dayTags, user, close }) {
   </div>);
 }
 
-function DietTab({ T, S, settings, persistSettings, dayTags, fridge, addFridgeItem, delFridgeItem, viewDate, user, day, todayCals, todayP, gramTargets, openLog, say }) {
+function MealGenCard({ T, S, foods, fridge, logMany, say }) {
+  const stock = useMemo(() => foods.filter((f) => f.have), [foods]);
+  const fresh = Object.values(fridge || {});
+  const [style, setStyle] = useState("any");
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState(null);
+  const lastNames = useRef([]);
+  const gen = async () => {
+    if (stock.length + fresh.length < 3) return say("First tap ✓ on foods you have, in the Library tab");
+    setBusy(true);
+    try {
+      const inv = stock.slice(0, 80).map((f) => `${f.name} [${f.serving}] ${Math.round(f.cal)}cal ${Math.round(f.p)}P`).join("\n");
+      const fr = fresh.map((x) => { const left = x.days - Math.max(0, daysBetween(x.added, todayStr())); return `${x.name} (${left <= 0 ? "use today" : `${left}d left`})`; }).join(", ");
+      const avoid = lastNames.current.length ? ` Do not repeat or lightly rework these earlier ideas: ${lastNames.current.join("; ")}.` : "";
+      const styleLine = style === "any" ? "Mix savory and sweet freely across the three." : `Make all three ${style}.`;
+      const prompt = `You generate meal inspiration for a home cook on a calorie cut who cooks WITHOUT oil (air fryer, oven, dry nonstick pan) and wants meals that feel like ordering out so he can practice recreating them.
+
+AVAILABLE (pantry/freezer, per-serving nutrition):
+${inv}${fr ? `
+FRESH IN FRIDGE (work these in, soonest-expiring first): ${fr}` : ""}
+
+Create exactly 3 clearly different meals, each 500-800 kcal total and high protein. Default shape: protein + carb + vegetable, fruit optional. Stand-alone convenience items (frozen tenders, dumplings) may skip the vegetable and pair with just a carb. Sweet options like a yogurt-fruit bowl are welcome. ${styleLine}${avoid} Name each like a restaurant menu item and tag the style (e.g. "Chipotle-style", "izakaya", "diner"). Use AVAILABLE items by their EXACT names with realistic serving counts; free seasonings (spices, vinegar, soy sauce, hot sauce, mustard, sugar-free syrup) can be assumed. If 1-2 cheap missing ingredients would clearly complete a meal, include the meal anyway and list them in "missing".
+
+Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"items":[{"food":"exact name from AVAILABLE","srv":number}],"missing":[string],"cal":number,"p":number,"how":"method in under 25 words"}],"buy":"1-3 staples worth buying to unlock more variety, under 15 words"}`;
+      const out = extractJSON(await askClaude(prompt, 1600));
+      const meals = (out.meals || []).slice(0, 3);
+      if (!meals.length) throw new Error("empty");
+      lastNames.current = [...lastNames.current, ...meals.map((m) => m.name)].slice(-9);
+      setRes({ meals, buy: out.buy || null });
+    } catch (e) { say(aiErrMsg(e, "Couldn't generate meals — try again")); }
+    setBusy(false);
+  };
+  const logIdea = (m) => {
+    const pairs = [], misses = [];
+    (m.items || []).forEach((it) => {
+      const nm = String(it.food || "").toLowerCase();
+      const f = foods.find((x) => x.name.toLowerCase() === nm) || foods.find((x) => x.name.toLowerCase().includes(nm)) || foods.find((x) => nm.includes(x.name.toLowerCase()));
+      if (f) pairs.push({ food: f, qty: +it.srv > 0 ? +it.srv : 1 });
+      else misses.push(it.food);
+    });
+    if (!pairs.length) return say("Couldn't match those items to your library");
+    logMany(pairs, autoMeal());
+    if (misses.length) say(`Logged ${pairs.length} — no match for: ${misses.join(", ")}`, 5000);
+  };
+  const mealLabel = MEALS.find((x) => x.key === autoMeal()).label;
+  return (<div style={{ ...S.card, marginTop: 10 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ fontWeight: 700, fontSize: 14 }}>🍳 Cook something new</span>
+      <span style={{ fontSize: 11, color: T.mut }}>{stock.length} ✓ in stock · {fresh.length} fresh</span>
+    </div>
+    <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
+      {[["any", "Any"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
+        <button key={k} onClick={() => setStyle(k)} style={{ ...pill(T), flex: 1, padding: "6px 2px", fontSize: 11.5, background: style === k ? T.mintSoft : T.cardAlt, color: style === k ? T.mint : T.sub, borderColor: style === k ? T.mint : T.border }}>{l}</button>))}
+    </div>
+    <button onClick={gen} disabled={busy} style={{ ...pill(T), width: "100%", marginTop: 8, fontSize: 12.5 }}>{busy ? "Dreaming up meals…" : res ? "✨ New ideas" : "✨ Generate 3 meal ideas"}</button>
+    {stock.length === 0 && !res && <div style={{ fontSize: 11, color: T.mut, marginTop: 6 }}>Ideas build from Library items you've marked ✓ plus whatever is in your fridge list.</div>}
+    {res && res.meals.map((m, i) => (<div key={i} style={{ background: T.cardAlt, borderRadius: 12, padding: "9px 11px", marginTop: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, minWidth: 0 }}>{m.name}</span>
+        <span style={{ fontSize: 11.5, color: T.sub, flexShrink: 0 }}>~{fmtN(m.cal)} cal · {Math.round(m.p)}P</span>
+      </div>
+      <div style={{ fontSize: 10.5, color: T.mint, marginTop: 1 }}>{m.style}</div>
+      <div style={{ fontSize: 11.5, color: T.sub, marginTop: 5 }}>
+        {(m.items || []).map((it, j) => (<div key={j}>• {it.food}{+it.srv !== 1 ? ` ×${rnd(it.srv, 2)}` : ""}</div>))}
+        {(m.missing || []).length > 0 && <div style={{ color: T.amber, marginTop: 2 }}>🛒 grab: {m.missing.join(", ")}</div>}
+      </div>
+      {m.how && <div style={{ fontSize: 10.5, color: T.mut, marginTop: 5 }}>{m.how}</div>}
+      <button onClick={() => logIdea(m)} style={{ ...pill(T), width: "100%", marginTop: 7, padding: "7px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealLabel}</button>
+    </div>))}
+    {res && res.buy && <div style={{ fontSize: 11, color: T.sub, marginTop: 8 }}>🛒 Worth buying: {res.buy}</div>}
+  </div>);
+}
+
+function DietTab({ T, S, settings, persistSettings, dayTags, fridge, addFridgeItem, delFridgeItem, viewDate, user, day, todayCals, todayP, gramTargets, foods, logMany, openLog, say }) {
   const dsel = viewDate;
   const wkStart = nutrWeekStartOf(dsel, settings.nutrWeekStart);
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(wkStart, i));
@@ -1554,6 +1634,8 @@ function DietTab({ T, S, settings, persistSettings, dayTags, fridge, addFridgeIt
         </div>))}
       </div>}
     </div>
+
+    <MealGenCard T={T} S={S} foods={foods} fridge={fridge} logMany={logMany} say={say} />
 
     <div style={{ ...S.card, marginTop: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1969,7 +2051,9 @@ function Trends({ T, S, logCals, settings, weightsMap, setWeight, delWeight, ste
 
 function Library({ T, S, foods, patchFood, deleteFood, onLog, openEditor, openRecipe, openQuick, say }) {
   const [q, setQ] = useState("");
-  const list = foods.filter((f) => !q || f.name.toLowerCase().includes(q.toLowerCase()) || (f.brand || "").toLowerCase().includes(q.toLowerCase())).sort((a, b) => (b.fav - a.fav) || a.name.localeCompare(b.name));
+  const [stockOnly, setStockOnly] = useState(false);
+  const haveCount = foods.filter((f) => f.have).length;
+  const list = foods.filter((f) => !stockOnly || f.have).filter((f) => !q || f.name.toLowerCase().includes(q.toLowerCase()) || (f.brand || "").toLowerCase().includes(q.toLowerCase())).sort((a, b) => (b.fav - a.fav) || a.name.localeCompare(b.name));
   return (<div style={S.card}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
       <span style={{ fontWeight: 700, fontSize: 14 }}>Food library · {foods.length}</span>
@@ -1979,10 +2063,16 @@ function Library({ T, S, foods, patchFood, deleteFood, onLog, openEditor, openRe
       </div>
     </div>
     <input placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inp(T), marginTop: 10 }} />
+    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+      {[[false, `All · ${foods.length}`], [true, `✓ In stock · ${haveCount}`]].map(([k, l]) => (
+        <button key={String(k)} onClick={() => setStockOnly(k)} style={{ ...pill(T), flex: 1, padding: "7px 4px", fontSize: 12, background: stockOnly === k ? T.mintSoft : T.cardAlt, color: stockOnly === k ? T.mint : T.sub, borderColor: stockOnly === k ? T.mint : T.border }}>{l}</button>))}
+    </div>
+    <div style={{ fontSize: 10.5, color: T.mut, marginTop: 6 }}>Tap ✓ on what you have at home — meal ideas on the Diet tab build from it.</div>
     <div style={{ marginTop: 6 }}>
       {list.slice(0, 200).map((f) => (<SwipeRow key={f.id} T={T} onDelete={() => { deleteFood(f.id); say("Deleted"); }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", borderBottom: `1px solid ${T.border}` }}>
           <button onClick={() => patchFood(f.id, { fav: !f.fav })} style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", color: f.fav ? T.amber : T.mut }}>{f.fav ? "★" : "☆"}</button>
+          <button onClick={() => patchFood(f.id, { have: !f.have })} style={{ width: 24, height: 24, borderRadius: 12, border: `1.5px solid ${f.have ? T.mint : T.border}`, background: f.have ? T.mintSoft : "transparent", color: f.have ? T.mint : T.mut, fontSize: 13, cursor: "pointer", padding: 0, flexShrink: 0, fontWeight: 700 }}>✓</button>
           <div onClick={() => openEditor(f)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
             <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}{f.kind === "recipe" ? " 🧾" : ""}</div>
             <div style={{ fontSize: 11, color: T.mut }}>{f.serving} · {fmtN(f.cal)} kcal · P{Math.round(f.p)} C{Math.round(f.c)} F{Math.round(f.f)}{f.src === "photo" ? " · 📷" : f.src === "text" ? " · ✍️" : f.src === "manual" ? " · ⌨️" : f.src === "usda" ? " · USDA" : ""}</div>
@@ -2257,7 +2347,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.1</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.5</div>
     </div>
   </>);
 }
