@@ -1514,6 +1514,12 @@ function tokEq(a, b) {
   if (sa === sb) return true;
   return (a.length >= 5 && b.startsWith(a)) || (b.length >= 5 && a.startsWith(b));
 }
+function foodHead(name) {
+  // the word a product actually IS: last plain word of the first comma segment ("Rao's Pasta Sauce" → sauce, "Chicken breast, cooked" → breast)
+  const toks = foodTokens(String(name || "").split(",")[0]);
+  for (let i = toks.length - 1; i >= 0; i--) if (/^[a-z]+$/.test(toks[i])) return toks[i];
+  return toks[toks.length - 1] || "";
+}
 function findFood(foods, name) {
   const nm = String(name || "").toLowerCase().trim();
   if (!nm) return null;
@@ -1526,8 +1532,10 @@ function findFood(foods, name) {
     return q.every((qt) => ft.some((t) => tokEq(qt, t)));
   });
   if (!cands.length) return foods.find((x) => x.name.toLowerCase().includes(nm)) || foods.find((x) => nm.includes(x.name.toLowerCase())) || null;
-  // in-stock beats exact spelling: a checked variant outranks an unchecked exact match
-  cands.sort((a, b) => ((b.have ? 1 : 0) - (a.have ? 1 : 0)) || ((b.name.toLowerCase() === nm ? 1 : 0) - (a.name.toLowerCase() === nm ? 1 : 0)) || ((b.uses || 0) - (a.uses || 0)) || (a.name.length - b.name.length));
+  // a product whose head noun is one of the asked-for words ("pasta") outranks one where it's a modifier ("pasta sauce");
+  // then in-stock beats exact spelling, so a checked variant outranks an unchecked exact match
+  const headOk = (f) => { const h = foodHead(f.name); return q.some((t) => tokEq(t, h)) ? 1 : 0; };
+  cands.sort((a, b) => (headOk(b) - headOk(a)) || ((b.have ? 1 : 0) - (a.have ? 1 : 0)) || ((b.name.toLowerCase() === nm ? 1 : 0) - (a.name.toLowerCase() === nm ? 1 : 0)) || ((b.uses || 0) - (a.uses || 0)) || (a.name.length - b.name.length));
   return cands[0];
 }
 
