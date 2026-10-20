@@ -1517,17 +1517,17 @@ function tokEq(a, b) {
 function findFood(foods, name) {
   const nm = String(name || "").toLowerCase().trim();
   if (!nm) return null;
-  const exact = foods.find((x) => x.name.toLowerCase() === nm);
-  if (exact) return exact;
   const q = foodTokens(nm);
-  if (!q.length) return null;
   // every word of the ingredient must appear in the food's name — brands and extra words are fine
   const cands = foods.filter((f) => {
+    if (f.name.toLowerCase() === nm) return true;
+    if (!q.length) return false;
     const ft = foodTokens(f.name);
     return q.every((qt) => ft.some((t) => tokEq(qt, t)));
   });
   if (!cands.length) return foods.find((x) => x.name.toLowerCase().includes(nm)) || foods.find((x) => nm.includes(x.name.toLowerCase())) || null;
-  cands.sort((a, b) => ((b.have ? 1 : 0) - (a.have ? 1 : 0)) || ((b.uses || 0) - (a.uses || 0)) || (a.name.length - b.name.length));
+  // in-stock beats exact spelling: a checked variant outranks an unchecked exact match
+  cands.sort((a, b) => ((b.have ? 1 : 0) - (a.have ? 1 : 0)) || ((b.name.toLowerCase() === nm ? 1 : 0) - (a.name.toLowerCase() === nm ? 1 : 0)) || ((b.uses || 0) - (a.uses || 0)) || (a.name.length - b.name.length));
   return cands[0];
 }
 
