@@ -1766,8 +1766,8 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
         </span>
       </div>
       {idea.style && <div style={{ fontSize: 10.5, color: T.mint, marginTop: 1 }}>{idea.style}</div>}
-      <div style={{ fontSize: 11.5, marginTop: 5, lineHeight: 1.8 }}>
-        {rows.map((r, j) => (<span key={j} style={{ whiteSpace: "nowrap", marginRight: 10, color: r.have ? T.sub : T.amber }}>{r.have ? "✓" : "🛒"} {r.food ? r.food.name : r.name}</span>))}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 11.5, marginTop: 6 }}>
+        {rows.map((r, j) => (<span key={j} style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: r.have ? T.sub : T.amber }}>{r.have ? "✓" : "🛒"} {r.food ? r.food.name : r.name}</span>))}
       </div>
       {ready && <button onClick={() => logMany(rows.map((r) => ({ food: r.food, qty: +r.srv > 0 ? +r.srv : 1 })), nextSlot)} style={{ ...pill(T), width: "100%", marginTop: 8, padding: "7px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealMeta.label}</button>}
     </div>))}
