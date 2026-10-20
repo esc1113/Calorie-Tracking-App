@@ -360,7 +360,7 @@ const pill = (T) => ({ padding: "9px 14px", borderRadius: 12, border: `1px solid
 const inp = (T) => ({ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.cardAlt, color: T.text, fontSize: 16, outline: "none", boxSizing: "border-box" });
 function autoMeal() { const h = new Date().getHours(); return h < 10.5 ? "breakfast" : h < 15 ? "lunch" : h < 20.5 ? "dinner" : "snacks"; }
 
-const DEFAULT_SETTINGS = { theme: "light", calTarget: 2650, macroMode: "pct", macroPct: { p: 30, c: 45, f: 25 }, macroG: { p: 199, c: 298, f: 74 }, waterGoal: 64, calView: "remaining", goalW: 140, rate: 1, nutrWeekStart: "sun", ramp: 1 };
+const DEFAULT_SETTINGS = { theme: "light", calTarget: 2650, macroMode: "pct", macroPct: { p: 30, c: 45, f: 25 }, macroG: { p: 199, c: 298, f: 74 }, waterGoal: 64, calView: "remaining", goalW: 140, rate: 1, nutrWeekStart: "sun", ramp: 1, goal: "cut" };
 
 export default function App() {
   const [user, setUser] = useState(undefined);
@@ -372,6 +372,7 @@ export default function App() {
   const [stepsMap, setStepsMap] = useState({});
   const [logCals, setLogCals] = useState({});
   const [dayTags, setDayTags] = useState({});
+  const [ideas, setIdeas] = useState({});
   const [date, setDate] = useState(todayStr());
   const [day, setDay] = useState(emptyDay());
   const [sheet, setSheet] = useState(null);
@@ -501,6 +502,28 @@ export default function App() {
     } catch (e) { console.error(e); }
   }, [ready]);
 
+  const ideasParamDone = useRef(false);
+  useEffect(() => {
+    if (!ready || ideasParamDone.current) return;
+    ideasParamDone.current = true;
+    try {
+      const u = new URL(window.location.href);
+      const raw = u.searchParams.get("ideas");
+      if (!raw) return;
+      const specs = JSON.parse(raw);
+      let n = 0;
+      (Array.isArray(specs) ? specs : [specs]).forEach((sp) => {
+        const name = String(sp.name || "").trim();
+        if (!name || Object.values(ideas).find((x) => x.name.toLowerCase() === name.toLowerCase())) return;
+        addIdea({ name, style: sp.style || null, items: sp.items, src: "import" });
+        n++;
+      });
+      if (n) say(`📌 ${n} idea${n === 1 ? "" : "s"} saved to try`);
+      u.searchParams.delete("ideas");
+      window.history.replaceState({}, "", u.pathname + (u.searchParams.toString() ? "?" + u.searchParams.toString() : ""));
+    } catch (e) { console.error(e); }
+  }, [ready]);
+
   useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
@@ -516,11 +539,11 @@ export default function App() {
       seeded.forEach((f) => batch.set(doc(db, "fuel_users", user.uid, "foods", f.id), f));
       batch.set(doc(db, "fuel_users", user.uid), { seeded: true, tagsV: 3, settings: DEFAULT_SETTINGS, weights: {}, logcals: {}, daytags: {}, fridge: {}, steps: {} }, { merge: true });
       await batch.commit();
-      setFoods(seeded); setSettings(DEFAULT_SETTINGS); setWeightsMap({}); setLogCals({}); setDayTags({});
+      setFoods(seeded); setSettings(DEFAULT_SETTINGS); setWeightsMap({}); setLogCals({}); setDayTags({}); setIdeas({});
     } else {
       const d = main.data();
       setSettings({ ...DEFAULT_SETTINGS, ...(d.settings || {}) });
-      setWeightsMap(d.weights || {}); setLogCals(d.logcals || {}); setStepsMap(d.steps || {}); setDayTags(d.daytags || {});
+      setWeightsMap(d.weights || {}); setLogCals(d.logcals || {}); setStepsMap(d.steps || {}); setDayTags(d.daytags || {}); setIdeas(d.ideas || {});
       let fs = (await getDocs(collection(db, "fuel_users", user.uid, "foods"))).docs.map((x) => x.data());
       if ((d.tagsV || 0) < 3) {
         const batch = writeBatch(db);
@@ -577,6 +600,16 @@ export default function App() {
   const patchFood = (id, patch) => { setFoods((fs) => fs.map((x) => (x.id === id ? { ...x, ...patch } : x))); if (user) setDoc(doc(db, "fuel_users", user.uid, "foods", id), patch, { merge: true }).catch(console.error); };
   const setFoodTags = (id, tags) => patchFood(id, { tags });
   const deleteFood = (id) => { setFoods((fs) => fs.filter((x) => x.id !== id)); if (user) deleteDoc(doc(db, "fuel_users", user.uid, "foods", id)).catch(console.error); };
+  const addIdea = (p) => {
+    const it = { id: uid(), name: String(p.name || "Meal idea"), style: p.style || null, items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name), src: p.src || "manual", added: Date.now() };
+    if (!it.items.length) return;
+    setIdeas((m) => ({ ...m, [it.id]: it }));
+    if (user) updateDoc(mainRef(), { [`ideas.${it.id}`]: it }).catch(console.error);
+  };
+  const delIdea = (id) => {
+    setIdeas((m) => { const n = { ...m }; delete n[id]; return n; });
+    if (user) updateDoc(mainRef(), { [`ideas.${id}`]: deleteField() }).catch(console.error);
+  };
   const setWeight = (d, v) => { setWeightsMap((m) => ({ ...m, [d]: v })); if (user) updateDoc(mainRef(), { [`weights.${d}`]: v }).catch(console.error); };
   const delWeight = (d) => { setWeightsMap((m) => { const n = { ...m }; delete n[d]; return n; }); if (user) updateDoc(mainRef(), { [`weights.${d}`]: deleteField() }).catch(console.error); };
   const setSteps = (d, n) => {
@@ -809,7 +842,7 @@ export default function App() {
           })}
         </>}
 
-        {tab === "diet" && <DietTab T={T} S={S} settings={settings} viewDate={date} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} logMany={logMany} goLibrary={() => setTab("library")} say={say} />}
+        {tab === "diet" && <DietTab T={T} S={S} settings={settings} viewDate={date} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} ideas={ideas} addIdea={addIdea} delIdea={delIdea} logMany={logMany} goLibrary={() => setTab("library")} say={say} />}
         {tab === "trends" && <Trends T={T} S={S} logCals={logCals} settings={settings} weightsMap={weightsMap} setWeight={setWeight} delWeight={delWeight} stepsMap={stepsMap} setSteps={setSteps} delSteps={delSteps} tdee={tdee} openDay={openDay} say={say} />}
         {tab === "library" && <Library T={T} S={S} foods={foods} patchFood={patchFood} deleteFood={deleteFood} onLog={(f) => setSheet({ meal: autoMeal(), tab: "search", pre: f })} openEditor={(f) => setTagFood(f)} openRecipe={() => setRecipeOpen({})} openQuick={() => setQuickOpen(true)} say={say} />}
         {tab === "settings" && <Settings T={T} S={S} settings={settings} persistSettings={persistSettings} gramTargets={gramTargets} user={user} say={say} />}
@@ -896,7 +929,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.6</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.7</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1463,12 +1496,117 @@ function GroupDetail({ T, gid, weekDates, dayTags, user, close }) {
   </div>);
 }
 
-function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets, foods, logMany, goLibrary, say }) {
+function findFood(foods, name) {
+  const nm = String(name || "").toLowerCase().trim();
+  if (!nm) return null;
+  return foods.find((x) => x.name.toLowerCase() === nm) || foods.find((x) => x.name.toLowerCase().includes(nm)) || foods.find((x) => nm.includes(x.name.toLowerCase())) || null;
+}
+
+const IDEA_SCHEMA = `{"name": "short dish name", "style": "cuisine or restaurant vibe, or null", "items": [{"name": "one component food, generic (e.g. sourdough bread, greek yogurt, banana)", "srv": rough number of servings}]}`;
+
+async function parseIdeaText(desc) {
+  const txt = await askClaude([{ type: "text", text: `Break this meal idea into its component foods: "${desc}". Respond with ONLY valid JSON, no markdown, exactly: ${IDEA_SCHEMA}. Components are single foods a food library would hold, not sub-dishes.` }]);
+  return extractJSON(txt);
+}
+
+async function parseIdeaImage(base64, mediaType) {
+  const txt = await askClaude([
+    { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+    { type: "text", text: `This is a meal photo, often a screenshot from a cooking or full-day-of-eating video (ignore calorie overlays and captions). Identify the dish and its visible or likely component foods. Respond with ONLY valid JSON, no markdown, exactly: ${IDEA_SCHEMA}. If no food is visible, return {"error":"no food"}.` },
+  ]);
+  return extractJSON(txt);
+}
+
+function IdeaSaveSheet({ T, onSave, close, say }) {
+  const [mode, setMode] = useState("text");
+  const [desc, setDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [prev, setPrev] = useState(null);
+  const camRef = useRef();
+  const upRef = useRef();
+  const norm = (o) => ({ name: String(o.name || "Meal idea"), style: o.style || null, items: (o.items || []).map((it) => ({ name: String(it.name || "").trim(), srv: +it.srv > 0 ? rnd(+it.srv, 2) : 1 })).filter((it) => it.name) });
+  const parseText = async () => {
+    if (!desc.trim()) return;
+    setBusy(true);
+    try { const p = await parseIdeaText(desc.trim()); if (p.error) say("Couldn't read a meal out of that"); else setPrev(norm(p)); }
+    catch (e) { say(aiErrMsg(e, "Couldn't parse that — try rephrasing")); }
+    setBusy(false);
+  };
+  const handleFiles = async (list) => {
+    const f = Array.from(list || [])[0];
+    if (!f) return;
+    setBusy(true);
+    try { const b64 = await downscale(f); const p = await parseIdeaImage(b64, "image/jpeg"); if (p.error) say("No food detected in that image"); else setPrev(norm(p)); }
+    catch (e) { say(aiErrMsg(e, "Couldn't read that photo — try again")); }
+    setBusy(false);
+  };
+  const save = () => { if (!prev || !prev.items.length) return say("Need at least one ingredient"); onSave(prev); close(); };
+  const ov = { position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" };
+  const sh = { background: T.bg, width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", borderRadius: "18px 18px 0 0", padding: "16px 16px calc(env(safe-area-inset-bottom) + 16px)" };
+  return (<div style={ov} onClick={close}><div style={sh} onClick={(e) => e.stopPropagation()}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ fontWeight: 700, fontSize: 15 }}>Save a meal to try</span>
+      <button onClick={close} style={{ ...pill(T), padding: "6px 10px" }}>✕</button>
+    </div>
+    {!prev && <>
+      <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+        {[["text", "✏️ Describe"], ["photo", "📷 Screenshot"]].map(([k, l]) => (
+          <button key={k} onClick={() => setMode(k)} style={{ ...pill(T), flex: 1, background: mode === k ? T.mintSoft : T.cardAlt, color: mode === k ? T.mint : T.sub, borderColor: mode === k ? T.mint : T.border }}>{l}</button>))}
+      </div>
+      {mode === "text" && <>
+        <textarea rows={3} placeholder={'e.g. "sourdough toast with butter and honey + a greek yogurt bowl"'} value={desc} onChange={(e) => setDesc(e.target.value)} style={{ ...inp(T), marginTop: 10, resize: "none" }} />
+        <button onClick={parseText} disabled={busy} style={{ ...pill(T), width: "100%", marginTop: 8, background: T.mint, color: "#fff", borderColor: T.mint }}>{busy ? "Reading…" : "Break it down"}</button>
+      </>}
+      {mode === "photo" && <>
+        <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
+        <input ref={upRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <button onClick={() => camRef.current.click()} disabled={busy} style={{ ...pill(T), flex: 1, padding: 20, borderStyle: "dashed", background: "transparent" }}>{busy ? "Reading…" : "📷 Camera"}</button>
+          <button onClick={() => upRef.current.click()} disabled={busy} style={{ ...pill(T), flex: 1, padding: 20, borderStyle: "dashed", background: "transparent" }}>{busy ? "Reading…" : "🖼 Upload"}</button>
+        </div>
+        <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Screenshots from eating videos work — calorie overlays get ignored.</div>
+      </>}
+    </>}
+    {prev && <div style={{ marginTop: 12 }}>
+      <input value={prev.name} onChange={(e) => setPrev({ ...prev, name: e.target.value })} style={{ ...inp(T), fontWeight: 700 }} />
+      {prev.items.map((it, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+        <span style={{ flex: 1, fontSize: 13, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</span>
+        <span style={{ fontSize: 11.5, color: T.mut }}>×{it.srv}</span>
+        <button onClick={() => setPrev({ ...prev, items: prev.items.filter((_, j) => j !== i) })} style={{ ...btn(T), color: T.mut }}>✕</button>
+      </div>))}
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <button onClick={() => setPrev(null)} style={{ ...pill(T), flex: 1 }}>Back</button>
+        <button onClick={save} style={{ ...pill(T), flex: 2, background: T.mint, color: "#fff", borderColor: T.mint }}>Save to try</button>
+      </div>
+    </div>}
+  </div></div>);
+}
+
+function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets, foods, ideas, addIdea, delIdea, logMany, goLibrary, say }) {
   const stock = useMemo(() => foods.filter((f) => f.have), [foods]);
   const [style, setStyle] = useState("any");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
   const lastNames = useRef([]);
+  const [saveOpen, setSaveOpen] = useState(false);
+
+  const ideaList = useMemo(() => Object.values(ideas || {}).map((idea) => {
+    const rows = (idea.items || []).map((it) => { const f = findFood(foods, it.name); return { ...it, food: f, have: !!(f && f.have) }; });
+    const missing = rows.filter((r) => !r.have);
+    return { idea, rows, missing, ready: rows.length > 0 && missing.length === 0 };
+  }).sort((a, b) => (b.ready - a.ready) || ((b.idea.added || 0) - (a.idea.added || 0))), [ideas, foods]);
+
+  const shopList = useMemo(() => {
+    const m = {};
+    ideaList.forEach(({ idea, missing }) => missing.forEach((r) => {
+      const label = r.food ? r.food.name : titleCase(r.name);
+      const k = label.toLowerCase();
+      if (!m[k]) m[k] = { label, count: 0, completes: null, inLib: !!r.food };
+      m[k].count++;
+      if (missing.length === 1) m[k].completes = idea.name;
+    }));
+    return Object.values(m).sort((a, b) => ((b.completes ? 1 : 0) - (a.completes ? 1 : 0)) || (b.count - a.count)).slice(0, 10);
+  }, [ideaList]);
 
   const calLeft = Math.max(0, settings.calTarget - todayCals);
   const pLeft = Math.max(0, gramTargets.p - Math.round(todayP));
@@ -1481,8 +1619,10 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
   const budgetCal = Math.round(calLeft / emptyAhead / 25) * 25;
   const budgetP = Math.round(pLeft / emptyAhead / 5) * 5;
   const mealMeta = MEALS.find((m) => m.key === nextSlot);
+  const goal = settings.goal || "cut";
+  const hiCap = goal === "bulk" ? 950 : 850;
   const lowBudget = budgetCal < 450;
-  const target = Math.min(850, Math.max(450, budgetCal || 650));
+  const target = Math.min(hiCap, Math.max(450, budgetCal || 650));
 
   const gen = async () => {
     if (stock.length < 3) return say("First tap ✓ on foods you have, in the Library tab");
@@ -1492,14 +1632,20 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
       const avoid = lastNames.current.length ? ` Do not repeat or lightly rework these earlier ideas: ${lastNames.current.join("; ")}.` : "";
       const styleLine = style === "any" ? "Mix savory and sweet freely across the three." : `Make all three ${style}.`;
       const fit = lowBudget
-        ? "Aim each meal at 500-800 kcal — this is inspiration for his next full meals."
-        : `Aim each meal near ~${target} kcal (stay within 450-850); he has about ${budgetP}g protein left today, so push protein hard.`;
-      const prompt = `You generate meal inspiration for a home cook on a calorie cut who cooks WITHOUT oil (air fryer, oven, dry nonstick pan) and wants meals that feel like ordering out so he can practice recreating them at home.
+        ? `Aim each meal at ${goal === "bulk" ? "600-900" : "500-800"} kcal — this is inspiration for his next full meals.`
+        : `Aim each meal near ~${target} kcal (stay within 450-${hiCap}); he has about ${budgetP}g protein left today.`;
+      const goalLine = goal === "bulk" ? "He is on a lean bulk: build fuller plates, don't fear carbs, protein first."
+        : goal === "maintain" ? "He is eating at maintenance: balanced plates, protein still a priority."
+        : "He is on a calorie cut: keep meals filling for their calories and push protein hard.";
+      const staples = foods.filter((f) => (f.uses || 0) > 2).sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).map((f) => f.name).join(", ");
+      const savedNames = Object.values(ideas || {}).map((x) => x.name).slice(0, 12).join("; ");
+      const extra = `${staples ? ` His proven staples (familiar is fine, novelty wins): ${staples}.` : ""}${savedNames ? ` He already saved these to try, so suggest different things: ${savedNames}.` : ""}`;
+      const prompt = `You generate meal inspiration for a home cook who cooks WITHOUT oil (air fryer, oven, dry nonstick pan) and wants meals that feel like ordering out so he can practice recreating them at home. ${goalLine}
 
 AVAILABLE (everything he has on hand — pantry, freezer and fresh produce — with per-serving nutrition):
 ${inv}
 
-Create exactly 3 clearly different meals. ${fit} Default shape: protein + carb + vegetable, fruit optional — lean on any fresh produce in AVAILABLE. Stand-alone convenience items (frozen tenders, dumplings) may skip the vegetable and pair with just a carb. Sweet options like a yogurt-fruit bowl are welcome. ${styleLine}${avoid} Name each like a restaurant menu item and tag the style (e.g. "Chipotle-style", "izakaya", "diner"). Use AVAILABLE items by their EXACT names with realistic serving counts; free seasonings (spices, vinegar, soy sauce, hot sauce, mustard, sugar-free syrup) can be assumed. If 1-2 cheap missing ingredients would clearly complete a meal, include the meal anyway and list them in "missing".
+Create exactly 3 clearly different meals. ${fit} Default shape: protein + carb + vegetable, fruit optional — lean on any fresh produce in AVAILABLE. Stand-alone convenience items (frozen tenders, dumplings) may skip the vegetable and pair with just a carb. Sweet options like a yogurt-fruit bowl are welcome. ${styleLine}${avoid}${extra} Name each like a restaurant menu item and tag the style (e.g. "Chipotle-style", "izakaya", "diner"). Use AVAILABLE items by their EXACT names with realistic serving counts; free seasonings (spices, vinegar, soy sauce, hot sauce, mustard, sugar-free syrup) can be assumed. If 1-2 cheap missing ingredients would clearly complete a meal, include the meal anyway and list them in "missing".
 
 Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"items":[{"food":"exact name from AVAILABLE","srv":number}],"missing":[string],"cal":number,"p":number,"how":"method in under 25 words"}],"buy":"1-3 staples worth buying to unlock more variety, under 15 words"}`;
       const out = extractJSON(await askClaude(prompt, 1600));
@@ -1552,11 +1698,53 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
         {(m.missing || []).length > 0 && <div style={{ color: T.amber, marginTop: 3 }}>🛒 grab: {m.missing.join(", ")}</div>}
       </div>
       {m.how && <div style={{ fontSize: 11.5, color: T.mut, marginTop: 7, fontStyle: "italic" }}>{m.how}</div>}
-      <button onClick={() => logIdea(m)} style={{ ...pill(T), width: "100%", marginTop: 9, padding: "8px", fontSize: 12, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealMeta.label}</button>
+      <div style={{ display: "flex", gap: 8, marginTop: 9 }}>
+        <button onClick={() => { addIdea({ name: m.name, style: m.style || null, items: (m.items || []).map((it) => ({ name: it.food, srv: +it.srv > 0 ? +it.srv : 1 })), src: "gen" }); say("Saved to try"); }} style={{ ...pill(T), flex: 1, padding: "8px", fontSize: 12 }}>☆ Save</button>
+        <button onClick={() => logIdea(m)} style={{ ...pill(T), flex: 2, padding: "8px", fontSize: 12, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealMeta.label}</button>
+      </div>
     </div>))}
     {res && res.buy && <div style={{ ...S.card, marginTop: 10, padding: "10px 14px" }}>
       <span style={{ fontSize: 12, color: T.sub }}>🛒 <b style={{ color: T.text }}>Worth buying:</b> {res.buy}</span>
     </div>}
+
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, marginBottom: 2 }}>
+      <span style={{ fontWeight: 700, fontSize: 14 }}>📌 To try{ideaList.length ? ` · ${ideaList.length}` : ""}</span>
+      <button onClick={() => setSaveOpen(true)} style={{ ...pill(T), padding: "6px 12px", fontSize: 12, color: T.mint, borderColor: T.mint, background: "transparent" }}>+ Save idea</button>
+    </div>
+    {ideaList.length === 0 && <div style={{ ...S.card, marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: T.mut }}>See a meal in a video you want to recreate? Save it here — typed or straight from a screenshot — and Fuel tracks when you have everything to make it.</div>
+    </div>}
+    {ideaList.map(({ idea, rows, missing, ready }) => (<div key={idea.id} style={{ ...S.card, marginTop: 8, border: `1px solid ${ready ? T.mint : T.border}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 13.5, fontWeight: 700, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{idea.name}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {ready ? <span style={{ fontSize: 10.5, fontWeight: 700, color: T.mint, background: T.mintSoft, borderRadius: 8, padding: "3px 8px" }}>Ready</span>
+            : <span style={{ fontSize: 10.5, color: T.amber, fontWeight: 600 }}>{missing.length} short</span>}
+          <button onClick={() => { delIdea(idea.id); say("Removed"); }} style={{ ...btn(T), color: T.mut, minWidth: 26, height: 26 }}>✕</button>
+        </span>
+      </div>
+      {idea.style && <div style={{ fontSize: 10.5, color: T.mint, marginTop: 1 }}>{idea.style}</div>}
+      <div style={{ fontSize: 11.5, marginTop: 5, lineHeight: 1.8 }}>
+        {rows.map((r, j) => (<span key={j} style={{ whiteSpace: "nowrap", marginRight: 10, color: r.have ? T.sub : T.amber }}>{r.have ? "✓" : "🛒"} {r.food ? r.food.name : r.name}</span>))}
+      </div>
+      {ready && <button onClick={() => logMany(rows.map((r) => ({ food: r.food, qty: +r.srv > 0 ? +r.srv : 1 })), nextSlot)} style={{ ...pill(T), width: "100%", marginTop: 8, padding: "7px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealMeta.label}</button>}
+    </div>))}
+
+    {shopList.length > 0 && <div style={{ ...S.card, marginTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontWeight: 700, fontSize: 14 }}>🛒 Buy next</span>
+        <span style={{ fontSize: 10.5, color: T.mut }}>ranked by what each unlocks</span>
+      </div>
+      <div style={{ marginTop: 4 }}>
+        {shopList.map((x, i) => (<button key={i} onClick={goLibrary} style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", padding: "8px 0", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", color: T.text, textAlign: "left" }}>
+          <span style={{ fontSize: 13, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.label}{x.inLib ? "" : " *"}</span>
+          <span style={{ fontSize: 11, color: x.completes ? T.mint : T.sub, fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>{x.completes ? `completes ${x.completes}` : `in ${x.count} idea${x.count === 1 ? "" : "s"}`}</span>
+        </button>))}
+      </div>
+      <div style={{ fontSize: 10.5, color: T.mut, marginTop: 8 }}>Bought something? Check it ✓ in Library (tap a row to jump there). Items marked * aren't in your library yet — scan the label once when you buy.</div>
+    </div>}
+
+    {saveOpen && <IdeaSaveSheet T={T} onSave={(p) => { addIdea({ ...p, src: "manual" }); say("Saved to try"); }} close={() => setSaveOpen(false)} say={say} />}
   </>);
 }
 
@@ -2140,6 +2328,12 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Targets</div>
       <div style={row}><span style={{ fontSize: 13, color: T.sub }}>Daily calories</span><input type="number" value={settings.calTarget} onChange={(e) => up("calTarget", +e.target.value)} style={numIn} /></div>
       <div style={row}>
+        <span style={{ fontSize: 13, color: T.sub }}>Goal phase</span>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["cut", "Cut"], ["maintain", "Maintain"], ["bulk", "Bulk"]].map(([k, l]) => <button key={k} onClick={() => up("goal", k)} style={{ ...pill(T), padding: "6px 10px", fontSize: 12, background: (settings.goal || "cut") === k ? T.mintSoft : T.cardAlt, color: (settings.goal || "cut") === k ? T.mint : T.sub }}>{l}</button>)}
+        </div>
+      </div>
+      <div style={row}>
         <span style={{ fontSize: 13, color: T.sub }}>Macros set by</span>
         <div style={{ display: "flex", gap: 6 }}>
           {[["pct", "%"], ["g", "grams"]].map(([k, l]) => <button key={k} onClick={() => up("macroMode", k)} style={{ ...pill(T), padding: "6px 12px", background: settings.macroMode === k ? T.mintSoft : T.cardAlt, color: settings.macroMode === k ? T.mint : T.sub }}>{l}</button>)}
@@ -2185,7 +2379,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.6</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.7</div>
     </div>
   </>);
 }
