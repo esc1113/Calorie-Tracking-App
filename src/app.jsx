@@ -937,7 +937,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.11</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.12</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1626,9 +1626,10 @@ function IdeaSaveSheet({ T, foods, editing, onSave, close, say }) {
         </div>
         <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Screenshots from eating videos work — calorie overlays get ignored.</div>
       </>}
+      <button onClick={() => setPrev({ name: "", style: null, kind: null, slot: null, items: [] })} style={{ ...pill(T), width: "100%", marginTop: 10, background: "transparent", borderStyle: "dashed" }}>✎ Start from scratch — pick items yourself</button>
     </>}
     {prev && <div style={{ marginTop: 12 }}>
-      <input value={prev.name} onChange={(e) => setPrev({ ...prev, name: e.target.value })} style={{ ...inp(T), fontWeight: 700 }} />
+      <input placeholder="Name the meal (e.g. Chicken alfredo bowl)" value={prev.name} onChange={(e) => setPrev({ ...prev, name: e.target.value })} style={{ ...inp(T), fontWeight: 700 }} />
       {prev.items.map((it, i) => { const mf = findFood(foods || [], it.name); return (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
@@ -2514,7 +2515,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.11</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.12</div>
     </div>
   </>);
 }
