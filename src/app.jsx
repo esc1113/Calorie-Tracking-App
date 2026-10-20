@@ -372,7 +372,6 @@ export default function App() {
   const [stepsMap, setStepsMap] = useState({});
   const [logCals, setLogCals] = useState({});
   const [dayTags, setDayTags] = useState({});
-  const [fridge, setFridge] = useState({});
   const [date, setDate] = useState(todayStr());
   const [day, setDay] = useState(emptyDay());
   const [sheet, setSheet] = useState(null);
@@ -517,11 +516,11 @@ export default function App() {
       seeded.forEach((f) => batch.set(doc(db, "fuel_users", user.uid, "foods", f.id), f));
       batch.set(doc(db, "fuel_users", user.uid), { seeded: true, tagsV: 3, settings: DEFAULT_SETTINGS, weights: {}, logcals: {}, daytags: {}, fridge: {}, steps: {} }, { merge: true });
       await batch.commit();
-      setFoods(seeded); setSettings(DEFAULT_SETTINGS); setWeightsMap({}); setLogCals({}); setDayTags({}); setFridge({});
+      setFoods(seeded); setSettings(DEFAULT_SETTINGS); setWeightsMap({}); setLogCals({}); setDayTags({});
     } else {
       const d = main.data();
       setSettings({ ...DEFAULT_SETTINGS, ...(d.settings || {}) });
-      setWeightsMap(d.weights || {}); setLogCals(d.logcals || {}); setStepsMap(d.steps || {}); setDayTags(d.daytags || {}); setFridge(d.fridge || {});
+      setWeightsMap(d.weights || {}); setLogCals(d.logcals || {}); setStepsMap(d.steps || {}); setDayTags(d.daytags || {});
       let fs = (await getDocs(collection(db, "fuel_users", user.uid, "foods"))).docs.map((x) => x.data());
       if ((d.tagsV || 0) < 3) {
         const batch = writeBatch(db);
@@ -590,8 +589,6 @@ export default function App() {
     setStepsMap((m) => { const n = { ...m }; delete n[d]; return n; });
     if (user) updateDoc(mainRef(), { [`steps.${d}`]: deleteField() }).catch(console.error);
   };
-  const addFridgeItem = (item) => { setFridge((f) => ({ ...f, [item.id]: item })); if (user) updateDoc(mainRef(), { [`fridge.${item.id}`]: item }).catch(console.error); };
-  const delFridgeItem = (id) => { setFridge((f) => { const n = { ...f }; delete n[id]; return n; }); if (user) updateDoc(mainRef(), { [`fridge.${id}`]: deleteField() }).catch(console.error); };
 
   const totals = useMemo(() => dayTotals(day), [day]);
   const gramTargets = useMemo(() => {
@@ -812,7 +809,7 @@ export default function App() {
           })}
         </>}
 
-        {tab === "diet" && <DietTab T={T} S={S} settings={settings} persistSettings={persistSettings} dayTags={dayTags} fridge={fridge} addFridgeItem={addFridgeItem} delFridgeItem={delFridgeItem} viewDate={date} user={user} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} logMany={logMany} openLog={openLog} say={say} />}
+        {tab === "diet" && <DietTab T={T} S={S} settings={settings} viewDate={date} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} logMany={logMany} goLibrary={() => setTab("library")} say={say} />}
         {tab === "trends" && <Trends T={T} S={S} logCals={logCals} settings={settings} weightsMap={weightsMap} setWeight={setWeight} delWeight={delWeight} stepsMap={stepsMap} setSteps={setSteps} delSteps={delSteps} tdee={tdee} openDay={openDay} say={say} />}
         {tab === "library" && <Library T={T} S={S} foods={foods} patchFood={patchFood} deleteFood={deleteFood} onLog={(f) => setSheet({ meal: autoMeal(), tab: "search", pre: f })} openEditor={(f) => setTagFood(f)} openRecipe={() => setRecipeOpen({})} openQuick={() => setQuickOpen(true)} say={say} />}
         {tab === "settings" && <Settings T={T} S={S} settings={settings} persistSettings={persistSettings} gramTargets={gramTargets} user={user} say={say} />}
@@ -823,7 +820,7 @@ export default function App() {
 
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.navBg, backdropFilter: "blur(10px)", borderTop: `1px solid ${T.border}`, paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div style={{ maxWidth: 480, margin: "0 auto", display: "flex" }}>
-          {[["today", "Today", "🏠"], ["diet", "Diet", "🥦"], ["trends", "Trends", "📈"], ["library", "Library", "📚"], ["settings", "Settings", "⚙️"]].map(([k, l, ic]) => (
+          {[["today", "Today", "🏠"], ["diet", "Meals", "🍳"], ["trends", "Trends", "📈"], ["library", "Library", "📚"], ["settings", "Settings", "⚙️"]].map(([k, l, ic]) => (
             <button key={k} onClick={() => setTab(k)} style={{ flex: 1, padding: "10px 0 12px", background: "none", border: "none", cursor: "pointer", color: tab === k ? T.mint : T.mut, fontWeight: tab === k ? 700 : 500, fontSize: 11 }}>
               <div style={{ fontSize: 18 }}>{ic}</div>{l}
             </button>))}
@@ -899,7 +896,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.5</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.6</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1466,28 +1463,43 @@ function GroupDetail({ T, gid, weekDates, dayTags, user, close }) {
   </div>);
 }
 
-function MealGenCard({ T, S, foods, fridge, logMany, say }) {
+function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets, foods, logMany, goLibrary, say }) {
   const stock = useMemo(() => foods.filter((f) => f.have), [foods]);
-  const fresh = Object.values(fridge || {});
   const [style, setStyle] = useState("any");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
   const lastNames = useRef([]);
+
+  const calLeft = Math.max(0, settings.calTarget - todayCals);
+  const pLeft = Math.max(0, gramTargets.p - Math.round(todayP));
+  const hour = new Date().getHours();
+  const slots = ["breakfast", "lunch", "dinner", "snacks"];
+  const cutoffs = { breakfast: 11, lunch: 15, dinner: 21, snacks: 24 };
+  const future = viewDate > todayStr();
+  const nextSlot = future ? "breakfast" : slots.find((k) => (day.meals[k] || []).length === 0 && hour < cutoffs[k]) || "snacks";
+  const emptyAhead = future ? slots.length : Math.max(1, slots.filter((k) => (day.meals[k] || []).length === 0 && hour < cutoffs[k]).length);
+  const budgetCal = Math.round(calLeft / emptyAhead / 25) * 25;
+  const budgetP = Math.round(pLeft / emptyAhead / 5) * 5;
+  const mealMeta = MEALS.find((m) => m.key === nextSlot);
+  const lowBudget = budgetCal < 450;
+  const target = Math.min(850, Math.max(450, budgetCal || 650));
+
   const gen = async () => {
-    if (stock.length + fresh.length < 3) return say("First tap ✓ on foods you have, in the Library tab");
+    if (stock.length < 3) return say("First tap ✓ on foods you have, in the Library tab");
     setBusy(true);
     try {
-      const inv = stock.slice(0, 80).map((f) => `${f.name} [${f.serving}] ${Math.round(f.cal)}cal ${Math.round(f.p)}P`).join("\n");
-      const fr = fresh.map((x) => { const left = x.days - Math.max(0, daysBetween(x.added, todayStr())); return `${x.name} (${left <= 0 ? "use today" : `${left}d left`})`; }).join(", ");
+      const inv = stock.slice(0, 90).map((f) => `${f.name} [${f.serving}] ${Math.round(f.cal)}cal ${Math.round(f.p)}P`).join("\n");
       const avoid = lastNames.current.length ? ` Do not repeat or lightly rework these earlier ideas: ${lastNames.current.join("; ")}.` : "";
       const styleLine = style === "any" ? "Mix savory and sweet freely across the three." : `Make all three ${style}.`;
-      const prompt = `You generate meal inspiration for a home cook on a calorie cut who cooks WITHOUT oil (air fryer, oven, dry nonstick pan) and wants meals that feel like ordering out so he can practice recreating them.
+      const fit = lowBudget
+        ? "Aim each meal at 500-800 kcal — this is inspiration for his next full meals."
+        : `Aim each meal near ~${target} kcal (stay within 450-850); he has about ${budgetP}g protein left today, so push protein hard.`;
+      const prompt = `You generate meal inspiration for a home cook on a calorie cut who cooks WITHOUT oil (air fryer, oven, dry nonstick pan) and wants meals that feel like ordering out so he can practice recreating them at home.
 
-AVAILABLE (pantry/freezer, per-serving nutrition):
-${inv}${fr ? `
-FRESH IN FRIDGE (work these in, soonest-expiring first): ${fr}` : ""}
+AVAILABLE (everything he has on hand — pantry, freezer and fresh produce — with per-serving nutrition):
+${inv}
 
-Create exactly 3 clearly different meals, each 500-800 kcal total and high protein. Default shape: protein + carb + vegetable, fruit optional. Stand-alone convenience items (frozen tenders, dumplings) may skip the vegetable and pair with just a carb. Sweet options like a yogurt-fruit bowl are welcome. ${styleLine}${avoid} Name each like a restaurant menu item and tag the style (e.g. "Chipotle-style", "izakaya", "diner"). Use AVAILABLE items by their EXACT names with realistic serving counts; free seasonings (spices, vinegar, soy sauce, hot sauce, mustard, sugar-free syrup) can be assumed. If 1-2 cheap missing ingredients would clearly complete a meal, include the meal anyway and list them in "missing".
+Create exactly 3 clearly different meals. ${fit} Default shape: protein + carb + vegetable, fruit optional — lean on any fresh produce in AVAILABLE. Stand-alone convenience items (frozen tenders, dumplings) may skip the vegetable and pair with just a carb. Sweet options like a yogurt-fruit bowl are welcome. ${styleLine}${avoid} Name each like a restaurant menu item and tag the style (e.g. "Chipotle-style", "izakaya", "diner"). Use AVAILABLE items by their EXACT names with realistic serving counts; free seasonings (spices, vinegar, soy sauce, hot sauce, mustard, sugar-free syrup) can be assumed. If 1-2 cheap missing ingredients would clearly complete a meal, include the meal anyway and list them in "missing".
 
 Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"items":[{"food":"exact name from AVAILABLE","srv":number}],"missing":[string],"cal":number,"p":number,"how":"method in under 25 words"}],"buy":"1-3 staples worth buying to unlock more variety, under 15 words"}`;
       const out = extractJSON(await askClaude(prompt, 1600));
@@ -1498,6 +1510,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
     } catch (e) { say(aiErrMsg(e, "Couldn't generate meals — try again")); }
     setBusy(false);
   };
+
   const logIdea = (m) => {
     const pairs = [], misses = [];
     (m.items || []).forEach((it) => {
@@ -1507,218 +1520,43 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       else misses.push(it.food);
     });
     if (!pairs.length) return say("Couldn't match those items to your library");
-    logMany(pairs, autoMeal());
+    logMany(pairs, nextSlot);
     if (misses.length) say(`Logged ${pairs.length} — no match for: ${misses.join(", ")}`, 5000);
   };
-  const mealLabel = MEALS.find((x) => x.key === autoMeal()).label;
-  return (<div style={{ ...S.card, marginTop: 10 }}>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ fontWeight: 700, fontSize: 14 }}>🍳 Cook something new</span>
-      <span style={{ fontSize: 11, color: T.mut }}>{stock.length} ✓ in stock · {fresh.length} fresh</span>
-    </div>
-    <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
-      {[["any", "Any"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
-        <button key={k} onClick={() => setStyle(k)} style={{ ...pill(T), flex: 1, padding: "6px 2px", fontSize: 11.5, background: style === k ? T.mintSoft : T.cardAlt, color: style === k ? T.mint : T.sub, borderColor: style === k ? T.mint : T.border }}>{l}</button>))}
-    </div>
-    <button onClick={gen} disabled={busy} style={{ ...pill(T), width: "100%", marginTop: 8, fontSize: 12.5 }}>{busy ? "Dreaming up meals…" : res ? "✨ New ideas" : "✨ Generate 3 meal ideas"}</button>
-    {stock.length === 0 && !res && <div style={{ fontSize: 11, color: T.mut, marginTop: 6 }}>Ideas build from Library items you've marked ✓ plus whatever is in your fridge list.</div>}
-    {res && res.meals.map((m, i) => (<div key={i} style={{ background: T.cardAlt, borderRadius: 12, padding: "9px 11px", marginTop: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, minWidth: 0 }}>{m.name}</span>
-        <span style={{ fontSize: 11.5, color: T.sub, flexShrink: 0 }}>~{fmtN(m.cal)} cal · {Math.round(m.p)}P</span>
-      </div>
-      <div style={{ fontSize: 10.5, color: T.mint, marginTop: 1 }}>{m.style}</div>
-      <div style={{ fontSize: 11.5, color: T.sub, marginTop: 5 }}>
-        {(m.items || []).map((it, j) => (<div key={j}>• {it.food}{+it.srv !== 1 ? ` ×${rnd(it.srv, 2)}` : ""}</div>))}
-        {(m.missing || []).length > 0 && <div style={{ color: T.amber, marginTop: 2 }}>🛒 grab: {m.missing.join(", ")}</div>}
-      </div>
-      {m.how && <div style={{ fontSize: 10.5, color: T.mut, marginTop: 5 }}>{m.how}</div>}
-      <button onClick={() => logIdea(m)} style={{ ...pill(T), width: "100%", marginTop: 7, padding: "7px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealLabel}</button>
-    </div>))}
-    {res && res.buy && <div style={{ fontSize: 11, color: T.sub, marginTop: 8 }}>🛒 Worth buying: {res.buy}</div>}
-  </div>);
-}
-
-function DietTab({ T, S, settings, persistSettings, dayTags, fridge, addFridgeItem, delFridgeItem, viewDate, user, day, todayCals, todayP, gramTargets, foods, logMany, openLog, say }) {
-  const dsel = viewDate;
-  const wkStart = nutrWeekStartOf(dsel, settings.nutrWeekStart);
-  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(wkStart, i));
-  const daysLeft = Math.max(1, 7 - weekDates.filter((d) => d < todayStr()).length);
-  const week = useMemo(() => sumWeek(dayTags, weekDates), [dayTags, dsel]);
-  const today = dayTags[dsel] || { g: {}, pg: 0, fb: 0, pl: [], fv: [] };
-  const held = settings.ramp === 1 || settings.ramp === 2 ? RAMP_HELD : [];
-  const [detail, setDetail] = useState(null);
-  const [fOpen, setFOpen] = useState(false);
-  const [fName, setFName] = useState("");
-  const [fDays, setFDays] = useState("");
-  const [ideasAI, setIdeasAI] = useState(null);
-  const [ideasBusy, setIdeasBusy] = useState(false);
-
-  const calLeft = Math.max(0, settings.calTarget - todayCals);
-  const pLeft = Math.max(0, gramTargets.p - Math.round(todayP));
-  const hour = new Date().getHours();
-  const slots = ["breakfast", "lunch", "dinner", "snacks"];
-  const cutoffs = { breakfast: 11, lunch: 15, dinner: 21, snacks: 24 };
-  const nextSlot = dsel > todayStr() ? "breakfast" : slots.find((s) => (day.meals[s] || []).length === 0 && hour < cutoffs[s]) || "snacks";
-  const emptyAhead = dsel > todayStr() ? slots.length : Math.max(1, slots.filter((s) => (day.meals[s] || []).length === 0 && hour < cutoffs[s]).length);
-  const budgetCal = Math.round(calLeft / emptyAhead / 25) * 25;
-  const budgetP = Math.round(pLeft / emptyAhead / 5) * 5;
-  const mealMeta = MEALS.find((m) => m.key === nextSlot);
-
-  const unmetWeekly = WEEKLY_TARGETS.filter((w) => {
-    if (w.type === "ceiling" || held.includes(w.id)) return false;
-    const goal = w.type === "range" ? w.low : w.target;
-    return (week.g[w.id] || 0) < goal;
-  }).sort((a, b) => {
-    const need = (w) => ((w.type === "range" ? w.low : w.target) - (week.g[w.id] || 0));
-    return need(b) - need(a);
-  });
-  const unmetDaily = DAILY_TARGETS.filter((d) => {
-    if (d.id === "produceG") return false;
-    const goal = d.type === "range" ? d.low : d.target;
-    return (today.g[d.id] || 0) < goal;
-  });
-  const fridgeSoon = Object.values(fridge).filter((f) => {
-    const left = f.days - Math.max(0, daysBetween(f.added, todayStr()));
-    return left <= 3;
-  }).sort((a, b) => (a.days - daysBetween(a.added, todayStr())) - (b.days - daysBetween(b.added, todayStr())));
-
-  const ideas = [];
-  fridgeSoon.slice(0, 2).forEach((f) => { const left = f.days - Math.max(0, daysBetween(f.added, todayStr())); ideas.push({ what: f.name, why: left <= 0 ? "in your fridge · use today" : `in your fridge · ${left}d left`, fridge: true }); });
-  unmetWeekly.slice(0, Math.max(0, 3 - ideas.length)).forEach((w) => { const goal = w.type === "range" ? w.low : w.target; ideas.push({ what: FOOD_IDEAS[w.id], why: `${GROUPS[w.id].emoji} ${GROUPS[w.id].label}: ${rnd(week.g[w.id] || 0, 1)}/${goal} this week` }); });
-  unmetDaily.slice(0, Math.max(0, 3 - ideas.length)).forEach((d) => { const label = GROUPS[d.id]?.label || d.label; const emoji = GROUPS[d.id]?.emoji || d.emoji || ""; ideas.push({ what: FOOD_IDEAS[d.id], why: `${emoji} ${label}: not yet today` }); });
-
-  const askIdeas = async () => {
-    setIdeasBusy(true); setIdeasAI(null);
-    try {
-      const gapsW = unmetWeekly.slice(0, 4).map((w) => `${GROUPS[w.id].label} ${rnd(week.g[w.id] || 0, 1)}/${w.type === "range" ? w.low : w.target} for the week`).join(", ");
-      const res = await suggestForGaps(`${budgetCal} kcal and ${budgetP}g protein budget for ${mealMeta.label}; weekly food-group gaps: ${gapsW || "none"}; prefers high-protein, no cooking oil`);
-      setIdeasAI(res);
-    } catch (e) { say(aiErrMsg(e, "AI suggestion failed — try again")); }
-    setIdeasBusy(false);
-  };
-
-  const addF = () => {
-    if (!fName.trim()) return;
-    const days = +fDays > 0 ? Math.round(+fDays) : guessShelf(fName);
-    addFridgeItem({ id: uid(), name: fName.trim(), days, added: todayStr() });
-    setFName(""); setFDays(""); setFOpen(false);
-  };
-  const fridgeFillsGap = (name) => {
-    const t = autoTag(name);
-    const hit = Object.keys(t.g).find((k) => unmetWeekly.find((w) => w.id === k));
-    return hit ? GROUPS[hit].emoji : null;
-  };
-  const ramp = RAMP_STEPS.find((r) => r.id === settings.ramp) || RAMP_STEPS[0];
 
   return (<>
     <div style={S.card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={{ fontWeight: 700, fontSize: 14 }}>Next up · {mealMeta.icon} {mealMeta.label}{dsel > todayStr() ? " · planned" : ""}</span>
-        <span style={{ fontSize: 12, color: T.sub }}>~<b style={{ color: T.text }}>{fmtN(budgetCal)}</b> kcal · <b style={{ color: T.text }}>{budgetP}</b>g P</span>
-      </div>
-      {ideas.length > 0 && <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-        {ideas.slice(0, 3).map((x, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: T.cardAlt, borderRadius: 10, padding: "7px 10px" }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.what}</div>
-            <div style={{ fontSize: 10.5, color: T.mut }}>{x.why}</div>
-          </div>
-          {x.fridge && <button onClick={() => openLog(x.what)} style={{ ...pill(T), padding: "5px 10px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent", flexShrink: 0, marginLeft: 8 }}>Log</button>}
-        </div>))}
-      </div>}
-      <button onClick={askIdeas} style={{ ...pill(T), width: "100%", marginTop: 8, fontSize: 12.5 }}>{ideasBusy ? "Thinking…" : `✨ Ideas for ${mealMeta.label.toLowerCase()} (${fmtN(budgetCal)} kcal · ${budgetP}g P)`}</button>
-      {ideasAI && <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-        {ideasAI.map((t, i) => (<div key={i} style={{ background: T.cardAlt, borderRadius: 10, padding: "7px 10px" }}>
-          <div style={{ fontSize: 12.5, fontWeight: 600 }}>{t.food} <span style={{ color: T.mut, fontWeight: 400 }}>· {t.amount}</span></div>
-          <div style={{ fontSize: 10.5, color: T.sub }}>{t.why}</div>
-        </div>))}
-      </div>}
-    </div>
-
-    <MealGenCard T={T} S={S} foods={foods} fridge={fridge} logMany={logMany} say={say} />
-
-    <div style={{ ...S.card, marginTop: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 700, fontSize: 14 }}>Today{dsel !== todayStr() ? ` · ${shortDate(dsel)}` : ""}</span>
-        <span style={{ fontSize: 11.5, color: T.sub }}>🌈 <b style={{ color: today.pg >= 400 ? T.green : T.text }}>{today.pg}</b>/400g produce</span>
+        <span style={{ fontWeight: 700, fontSize: 15 }}>🍳 Meal ideas</span>
+        <button onClick={goLibrary} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11.5, color: T.mint, padding: 0, fontWeight: 600 }}>{stock.length} ✓ in stock ›</button>
       </div>
-      <div style={{ marginTop: 6 }}><Bar pct={(today.pg / 400) * 100} color={today.pg >= 400 ? T.green : T.mint} bg={T.barBg} h={5} /></div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px", marginTop: 10 }}>
-        {DAILY_TARGETS.filter((d) => d.id !== "produceG").map((d) => {
-          const v = today.g[d.id] || 0;
-          const label = GROUPS[d.id]?.label || d.label;
-          const emoji = GROUPS[d.id]?.emoji || d.emoji || "";
-          return (<button key={d.id} onClick={() => setDetail(d.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", padding: "3px 0", cursor: "pointer", color: T.text }}>
-            <span style={{ fontSize: 12 }}>{emoji} {label}</span>
-            <Pips T={T} val={v} low={d.type === "range" ? d.low : d.target} high={d.type === "range" ? d.high : d.target} ceiling={false} />
-          </button>);
-        })}
+      <div style={{ fontSize: 11.5, color: T.sub, marginTop: 4 }}>
+        Next up {mealMeta.icon} <b style={{ color: T.text }}>{mealMeta.label}</b>{future ? " · planning ahead" : ""} · {lowBudget ? `${fmtN(calLeft)} kcal left today — sizing ideas as full meals` : <>~<b style={{ color: T.text }}>{fmtN(budgetCal)}</b> kcal · <b style={{ color: T.text }}>{budgetP}</b>g P to spend</>}
       </div>
+      <div style={{ display: "flex", gap: 5, marginTop: 10 }}>
+        {[["any", "Any"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
+          <button key={k} onClick={() => setStyle(k)} style={{ ...pill(T), flex: 1, padding: "7px 2px", fontSize: 12, background: style === k ? T.mintSoft : T.cardAlt, color: style === k ? T.mint : T.sub, borderColor: style === k ? T.mint : T.border }}>{l}</button>))}
+      </div>
+      <button onClick={gen} disabled={busy} style={{ ...pill(T), width: "100%", marginTop: 10, padding: "11px", background: busy ? T.cardAlt : T.mint, color: busy ? T.sub : "#fff", borderColor: busy ? T.border : T.mint }}>{busy ? "Dreaming up meals…" : res ? "✨ New ideas" : "✨ Generate 3 meal ideas"}</button>
+      {stock.length === 0 && !res && <div style={{ fontSize: 11.5, color: T.mut, marginTop: 8 }}>Ideas build from what you've marked ✓ in your Library — pantry, freezer, and fresh produce alike. Tap the counter above to go check things off.</div>}
     </div>
 
-    <div style={{ ...S.card, marginTop: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 700, fontSize: 14 }}>This week</span>
-        <span style={{ fontSize: 11, color: T.mut }}>{shortDate(wkStart)} – {shortDate(addDays(wkStart, 6))} · {daysLeft}d left</span>
+    {res && res.meals.map((m, i) => (<div key={i} style={{ ...S.card, marginTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 700, minWidth: 0 }}>{m.name}</span>
+        <span style={{ fontSize: 12, color: T.sub, flexShrink: 0 }}>~{fmtN(m.cal)} cal · {Math.round(m.p)}P</span>
       </div>
-      <div style={{ marginTop: 8 }}>
-        {WEEKLY_TARGETS.map((w) => {
-          const v = week.g[w.id] || 0;
-          const isHeld = held.includes(w.id);
-          const goal = w.type === "range" ? w.low : w.target;
-          return (<button key={w.id} onClick={() => setDetail(w.id)} style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", padding: "7px 0", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", color: T.text, opacity: isHeld ? 0.55 : 1 }}>
-            <span style={{ fontSize: 12.5 }}>{GROUPS[w.id].emoji} {GROUPS[w.id].label}{isHeld ? " ⏸" : ""}</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Pips T={T} val={v} low={w.type === "range" ? w.low : w.target} high={w.type === "range" ? w.high : w.target} ceiling={w.type === "ceiling"} />
-              <span style={{ fontSize: 11.5, color: w.type === "ceiling" ? (v > w.target ? T.red : T.sub) : v >= goal ? T.green : T.sub, fontWeight: 600, minWidth: 34, textAlign: "right" }}>{rnd(v, 1)}/{w.type === "range" ? `${w.low}–${w.high}` : w.target}</span>
-            </span>
-          </button>);
-        })}
+      <div style={{ fontSize: 11, color: T.mint, marginTop: 2 }}>{m.style}</div>
+      <div style={{ fontSize: 12.5, color: T.sub, marginTop: 7 }}>
+        {(m.items || []).map((it, j) => (<div key={j} style={{ padding: "1.5px 0" }}>• {it.food}{+it.srv !== 1 ? ` ×${rnd(it.srv, 2)}` : ""}</div>))}
+        {(m.missing || []).length > 0 && <div style={{ color: T.amber, marginTop: 3 }}>🛒 grab: {m.missing.join(", ")}</div>}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: T.sub, marginTop: 8 }}>
-        <span>🌿 <b style={{ color: week.plants >= VARIETY.plants ? T.green : T.text }}>{week.plants}</b>/{VARIETY.plants} plants</span>
-        <span>🥣 <b style={{ color: week.ferms >= VARIETY.ferms ? T.green : T.text }}>{week.ferms}</b>/{VARIETY.ferms} ferment types</span>
-        <span>fiber ▲ <b style={{ color: T.text }}>{week.fbAvg}</b>g/d</span>
-      </div>
-    </div>
-
-    <div style={{ ...S.card, marginTop: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 700, fontSize: 14 }}>Fridge</span>
-        <button onClick={() => setFOpen(!fOpen)} style={{ ...btn(T), color: T.mint, borderColor: T.mint }}>+</button>
-      </div>
-      {fOpen && <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-        <input placeholder="What did you buy?" value={fName} onChange={(e) => setFName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addF()} style={inp(T)} />
-        <input placeholder={fName.trim() ? `${guessShelf(fName)}d` : "days"} value={fDays} onChange={(e) => setFDays(e.target.value)} type="number" style={{ ...inp(T), width: 74 }} />
-        <button onClick={addF} style={{ ...pill(T), background: T.mint, color: "#fff", borderColor: T.mint, flexShrink: 0 }}>Add</button>
-      </div>}
-      <div style={{ marginTop: 4 }}>
-        {Object.values(fridge).length === 0 && !fOpen && <div style={{ fontSize: 12, color: T.mut, padding: "8px 0" }}>Track what's perishable — expiring items surface as meal ideas before they turn.</div>}
-        {Object.values(fridge).sort((a, b) => (a.days - daysBetween(a.added, todayStr())) - (b.days - daysBetween(b.added, todayStr()))).map((f) => {
-          const left = f.days - Math.max(0, daysBetween(f.added, todayStr()));
-          const gap = fridgeFillsGap(f.name);
-          return (<div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-            <span style={{ flex: 1, fontSize: 13, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}{gap ? ` ${gap}` : ""}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: left <= 0 ? T.red : left <= 2 ? T.amber : T.mut, flexShrink: 0 }}>{left <= 0 ? "use now" : `${left}d`}</span>
-            <button onClick={() => openLog(f.name)} style={{ ...pill(T), padding: "4px 9px", fontSize: 11.5, flexShrink: 0 }}>Log</button>
-            <button onClick={() => { delFridgeItem(f.id); say("Removed"); }} style={{ ...btn(T), color: T.mut, flexShrink: 0 }}>✓</button>
-          </div>);
-        })}
-      </div>
-    </div>
-
-    <div style={{ ...S.card, marginTop: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 700, fontSize: 14 }}>Gut protocol</span>
-        <select value={settings.ramp} onChange={(e) => persistSettings({ ...settings, ramp: +e.target.value })} style={{ ...inp(T), width: "auto", padding: "6px 10px" }}>
-          {RAMP_STEPS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-        </select>
-      </div>
-      <div style={{ fontSize: 12, color: T.sub, marginTop: 8, lineHeight: 1.5 }}>{ramp.note}</div>
-      <div style={{ fontSize: 10, color: T.mut, marginTop: 8 }}>{MEDICAL_NOTE}</div>
-    </div>
-
-    {detail && <GroupDetail T={T} gid={detail} weekDates={weekDates} dayTags={dayTags} user={user} close={() => setDetail(null)} />}
+      {m.how && <div style={{ fontSize: 11.5, color: T.mut, marginTop: 7, fontStyle: "italic" }}>{m.how}</div>}
+      <button onClick={() => logIdea(m)} style={{ ...pill(T), width: "100%", marginTop: 9, padding: "8px", fontSize: 12, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealMeta.label}</button>
+    </div>))}
+    {res && res.buy && <div style={{ ...S.card, marginTop: 10, padding: "10px 14px" }}>
+      <span style={{ fontSize: 12, color: T.sub }}>🛒 <b style={{ color: T.text }}>Worth buying:</b> {res.buy}</span>
+    </div>}
   </>);
 }
 
@@ -2347,7 +2185,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.5</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.6</div>
     </div>
   </>);
 }
