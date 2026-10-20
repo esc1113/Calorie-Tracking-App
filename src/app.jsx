@@ -937,7 +937,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.9</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.10</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1565,13 +1565,21 @@ function classifyIdea(idea, rows, calEst) {
   return { kind, slot };
 }
 
-function IdeaSaveSheet({ T, editing, onSave, close, say }) {
+function IdeaSaveSheet({ T, foods, editing, onSave, close, say }) {
   const [mode, setMode] = useState("text");
   const [desc, setDesc] = useState("");
   const [busy, setBusy] = useState(false);
   const [prev, setPrev] = useState(editing ? { name: editing.name, style: editing.style || null, kind: editing.kind || null, slot: editing.slot || null, items: (editing.items || []).map((it) => ({ name: it.name, srv: it.srv })) } : null);
   const [newIng, setNewIng] = useState("");
   const addIng = () => { const n = newIng.trim(); if (!n || !prev) return; setPrev({ ...prev, items: [...prev.items, { name: n, srv: 1 }] }); setNewIng(""); };
+  const sugg = useMemo(() => {
+    const qq = newIng.trim().toLowerCase();
+    if (!qq) return [];
+    const toks = foodTokens(qq);
+    return (foods || []).filter((f) => { const fn = f.name.toLowerCase(); return fn.includes(qq) || (toks.length > 0 && toks.every((t) => foodTokens(f.name).some((x) => tokEq(t, x)))); })
+      .sort((a, b) => ((b.have ? 1 : 0) - (a.have ? 1 : 0)) || ((b.uses || 0) - (a.uses || 0)))
+      .slice(0, 5);
+  }, [newIng, foods]);
   const camRef = useRef();
   const upRef = useRef();
   const norm = (o) => ({ name: String(o.name || "Meal idea"), style: o.style || null, items: (o.items || []).map((it) => ({ name: String(it.name || "").trim(), srv: +it.srv > 0 ? rnd(+it.srv, 2) : 1 })).filter((it) => it.name) });
@@ -1619,19 +1627,31 @@ function IdeaSaveSheet({ T, editing, onSave, close, say }) {
     </>}
     {prev && <div style={{ marginTop: 12 }}>
       <input value={prev.name} onChange={(e) => setPrev({ ...prev, name: e.target.value })} style={{ ...inp(T), fontWeight: 700 }} />
-      {prev.items.map((it, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-        <span style={{ flex: 1, fontSize: 13, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</span>
+      {prev.items.map((it, i) => { const mf = findFood(foods || [], it.name); return (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
+          <div style={{ fontSize: 10, color: mf ? T.mut : T.amber, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{mf ? `→ ${mf.name} · ${fmtN(mf.cal)} cal/srv` : "no library match yet"}</div>
+        </div>
         <input type="number" inputMode="decimal" step="any" min="0" value={it.srv}
           onChange={(e) => { const v = e.target.value; setPrev((p) => ({ ...p, items: p.items.map((x, j) => (j === i ? { ...x, srv: v } : x)) })); }}
           onBlur={() => setPrev((p) => ({ ...p, items: p.items.map((x, j) => (j === i ? { ...x, srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 } : x)) }))}
           style={{ ...inp(T), width: 58, textAlign: "center", padding: "6px 4px", fontSize: 13 }} />
         <span style={{ fontSize: 11, color: T.mut }}>srv</span>
         <button onClick={() => setPrev({ ...prev, items: prev.items.filter((_, j) => j !== i) })} style={{ ...btn(T), color: T.mut }}>✕</button>
-      </div>))}
+      </div>); })}
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         <input placeholder="Add ingredient (e.g. honey)" value={newIng} onChange={(e) => setNewIng(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addIng()} style={inp(T)} />
         <button onClick={addIng} style={{ ...pill(T), flexShrink: 0 }}>Add</button>
       </div>
+      {newIng.trim() && sugg.length > 0 && <div style={{ marginTop: 4 }}>
+        {sugg.map((f) => (<button key={f.id} onClick={() => { setPrev({ ...prev, items: [...prev.items, { name: f.name, srv: 1 }] }); setNewIng(""); }} style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", padding: "7px 4px", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", color: T.text, textAlign: "left" }}>
+          <span style={{ fontSize: 12.5, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.have ? "✓ " : ""}{f.name}</span>
+          <span style={{ fontSize: 11, color: T.mut, flexShrink: 0, marginLeft: 8 }}>{f.serving} · {fmtN(f.cal)} cal</span>
+        </button>))}
+        <div style={{ fontSize: 10, color: T.mut, marginTop: 3 }}>Tap a product for exact nutrition — or Add keeps the name generic and brand-flexible.</div>
+      </div>}
+      {(() => { let c = 0, pp = 0, miss = 0; prev.items.forEach((it) => { const mf = findFood(foods || [], it.name); const q = +it.srv > 0 ? +it.srv : 1; if (mf) { c += mf.cal * q; pp += mf.p * q; } else miss++; }); return (
+        <div style={{ fontSize: 11.5, color: T.sub, marginTop: 10 }}>Adds up to ~<b style={{ color: T.text }}>{fmtN(c)}</b> cal · <b style={{ color: T.text }}>{Math.round(pp)}</b>g P{miss > 0 ? <span style={{ color: T.amber }}> · {miss} unmatched</span> : null}</div>); })()}
       <div style={{ display: "flex", gap: 5, marginTop: 10, alignItems: "center" }}>
         <span style={{ fontSize: 11, color: T.mut, width: 32, flexShrink: 0 }}>Type</span>
         {[[null, "Auto"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
@@ -1856,8 +1876,8 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       <div style={{ fontSize: 10.5, color: T.mut, marginTop: 8 }}>Bought something? Check it ✓ in Library (tap a row to jump there). Items marked * aren't in your library yet — scan the label once when you buy.</div>
     </div>}
 
-    {saveOpen && <IdeaSaveSheet T={T} onSave={(p) => { addIdea({ ...p, src: "manual" }); say("Saved to try"); }} close={() => setSaveOpen(false)} say={say} />}
-    {editIdea && <IdeaSaveSheet T={T} editing={editIdea} onSave={(p) => { updIdea(editIdea.id, p); say("Idea updated"); }} close={() => setEditIdea(null)} say={say} />}
+    {saveOpen && <IdeaSaveSheet T={T} foods={foods} onSave={(p) => { addIdea({ ...p, src: "manual" }); say("Saved to try"); }} close={() => setSaveOpen(false)} say={say} />}
+    {editIdea && <IdeaSaveSheet T={T} foods={foods} editing={editIdea} onSave={(p) => { updIdea(editIdea.id, p); say("Idea updated"); }} close={() => setEditIdea(null)} say={say} />}
   </>);
 }
 
@@ -2492,7 +2512,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.9</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.10</div>
     </div>
   </>);
 }
