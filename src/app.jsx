@@ -937,7 +937,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.12</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.13</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1698,6 +1698,7 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
 
   const shownIdeas = useMemo(() => {
     let L = ideaList;
+    if (ideaFilter === "buy") return [];
     if (ideaFilter === "sweet" || ideaFilter === "savory") L = L.filter((x) => x.kind === ideaFilter);
     else if (ideaFilter !== "all") L = L.filter((x) => x.slot === ideaFilter);
     const by = {
@@ -1829,7 +1830,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       <div style={{ fontSize: 12, color: T.mut }}>See a meal in a video you want to recreate? Save it here — typed or straight from a screenshot — and Fuel tracks when you have everything to make it.</div>
     </div>}
     {ideaList.length > 0 && <div style={{ display: "flex", gap: 5, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
-      {[["all", "All"], ["breakfast", "Bfast"], ["main", "Mains"], ["snack", "Snacks"], ["dessert", "Dessert"], ["preworkout", "Pre WO"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
+      {[["all", "All"], ["breakfast", "Bfast"], ["main", "Mains"], ["snack", "Snacks"], ["dessert", "Dessert"], ["preworkout", "Pre WO"], ["savory", "Savory"], ["sweet", "Sweet"], ["buy", `🛒 Buy${shopList.length ? ` · ${shopList.length}` : ""}`]].map(([k, l]) => (
         <button key={k} onClick={() => setIdeaFilter(k)} style={{ ...pill(T), padding: "5px 9px", fontSize: 11, background: ideaFilter === k ? T.mintSoft : T.cardAlt, color: ideaFilter === k ? T.mint : T.sub, borderColor: ideaFilter === k ? T.mint : T.border }}>{l}</button>))}
       <select value={ideaSort} onChange={(e) => setIdeaSort(e.target.value)} style={{ ...inp(T), width: "auto", padding: "5px 8px", fontSize: 11, marginLeft: "auto" }}>
         <option value="ready">Ready first</option>
@@ -1839,7 +1840,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
         <option value="az">A–Z</option>
       </select>
     </div>}
-    {ideaList.length > 0 && shownIdeas.length === 0 && <div style={{ fontSize: 12, color: T.mut, padding: "12px 4px" }}>Nothing in this category yet.</div>}
+    {ideaList.length > 0 && shownIdeas.length === 0 && ideaFilter !== "buy" && <div style={{ fontSize: 12, color: T.mut, padding: "12px 4px" }}>Nothing in this category yet.</div>}
     {shownIdeas.map(({ idea, rows, missing, ready, calEst, partial, kind, slot }) => {
       const open = !!openIdeas[idea.id];
       return (<div key={idea.id} style={{ ...S.card, marginTop: 8, border: `1px solid ${ready ? T.mint : T.border}` }}>
@@ -1865,11 +1866,12 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       </div>);
     })}
 
-    {shopList.length > 0 && <div style={{ ...S.card, marginTop: 10 }}>
+    {ideaFilter === "buy" && <div style={{ ...S.card, marginTop: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontWeight: 700, fontSize: 14 }}>🛒 Buy next</span>
         <span style={{ fontSize: 10.5, color: T.mut }}>ranked by what each unlocks</span>
       </div>
+      {shopList.length === 0 && <div style={{ fontSize: 12, color: T.mut, marginTop: 8 }}>Nothing to buy — every saved idea is fully stocked.</div>}
       <div style={{ marginTop: 4 }}>
         {shopList.map((x, i) => (<button key={i} onClick={goLibrary} style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", padding: "8px 0", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", color: T.text, textAlign: "left" }}>
           <span style={{ fontSize: 13, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.label}{x.inLib ? "" : " *"}</span>
@@ -2515,7 +2517,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.12</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.13</div>
     </div>
   </>);
 }
