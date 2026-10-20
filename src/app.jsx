@@ -937,7 +937,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.10</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.11</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1561,7 +1561,9 @@ function classifyIdea(idea, rows, calEst) {
   const savory = hits(["chicken", "beef", "turkey", "pork", "salmon", "fish", "shrimp", "egg", "rice", "pasta", "potato", "burger", "taco", "salsa", "marinara", "broccoli", "zucchini", "pickle", "onion", "cheese", "tortilla", "soup"]);
   const kind = idea.kind || (sweet > savory ? "sweet" : "savory");
   const bfast = hits(["oat", "yogurt", "toast", "egg", "pancake", "waffle", "cereal", "granola", "smoothie", "parfait", "breakfast", "brunch"]);
-  const slot = idea.slot || (bfast >= 1 ? "breakfast" : (calEst > 0 && calEst < 400) || rows.length <= 2 ? "snack" : "main");
+  const dessert = hits(["creami", "ice cream", "cookie", "brownie", "cake", "dessert", "sorbet", "frozen yogurt", "nice cream", "milkshake"]);
+  const pwo = hits(["pre workout", "preworkout", "pre-workout", "energy drink", "pwo"]);
+  const slot = idea.slot || (pwo >= 1 ? "preworkout" : dessert >= 1 ? "dessert" : bfast >= 1 ? "breakfast" : (calEst > 0 && calEst < 400) || rows.length <= 2 ? "snack" : "main");
   return { kind, slot };
 }
 
@@ -1659,7 +1661,7 @@ function IdeaSaveSheet({ T, foods, editing, onSave, close, say }) {
       </div>
       <div style={{ display: "flex", gap: 5, marginTop: 6, alignItems: "center" }}>
         <span style={{ fontSize: 11, color: T.mut, width: 32, flexShrink: 0 }}>Slot</span>
-        {[[null, "Auto"], ["breakfast", "Bfast"], ["main", "Main"], ["snack", "Snack"]].map(([k, l]) => (
+        {[[null, "Auto"], ["breakfast", "Bfast"], ["main", "Main"], ["snack", "Snack"], ["dessert", "Dsrt"], ["preworkout", "PreWO"]].map(([k, l]) => (
           <button key={l} onClick={() => setPrev({ ...prev, slot: k })} style={{ ...pill(T), flex: 1, padding: "5px 2px", fontSize: 11, background: (prev.slot || null) === k ? T.mintSoft : T.cardAlt, color: (prev.slot || null) === k ? T.mint : T.sub, borderColor: (prev.slot || null) === k ? T.mint : T.border }}>{l}</button>))}
       </div>
       <div style={{ fontSize: 10.5, color: T.mut, marginTop: 6 }}>Keep ingredient names generic ("chicken breast", not a brand) — any product in your library that fits will count, and checked ✓ ones win.</div>
@@ -1826,7 +1828,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       <div style={{ fontSize: 12, color: T.mut }}>See a meal in a video you want to recreate? Save it here — typed or straight from a screenshot — and Fuel tracks when you have everything to make it.</div>
     </div>}
     {ideaList.length > 0 && <div style={{ display: "flex", gap: 5, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
-      {[["all", "All"], ["breakfast", "Bfast"], ["main", "Mains"], ["snack", "Snacks"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
+      {[["all", "All"], ["breakfast", "Bfast"], ["main", "Mains"], ["snack", "Snacks"], ["dessert", "Dessert"], ["preworkout", "Pre WO"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
         <button key={k} onClick={() => setIdeaFilter(k)} style={{ ...pill(T), padding: "5px 9px", fontSize: 11, background: ideaFilter === k ? T.mintSoft : T.cardAlt, color: ideaFilter === k ? T.mint : T.sub, borderColor: ideaFilter === k ? T.mint : T.border }}>{l}</button>))}
       <select value={ideaSort} onChange={(e) => setIdeaSort(e.target.value)} style={{ ...inp(T), width: "auto", padding: "5px 8px", fontSize: 11, marginLeft: "auto" }}>
         <option value="ready">Ready first</option>
@@ -1849,7 +1851,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
           </span>
         </div>
         {open && <>
-          <div style={{ fontSize: 10.5, color: T.mut, marginTop: 3 }}>{idea.style ? `${idea.style} · ` : ""}{kind} · {slot}</div>
+          <div style={{ fontSize: 10.5, color: T.mut, marginTop: 3 }}>{idea.style ? `${idea.style} · ` : ""}{kind} · {slot === "preworkout" ? "pre workout" : slot}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 11.5, marginTop: 7 }}>
             {rows.map((r, j) => (<span key={j} style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: r.have ? T.sub : T.amber }}>{r.have ? "✓" : "🛒"} {r.food ? r.food.name : r.name} <span style={{ color: T.mut }}>×{rnd(r.srv, 2)}</span></span>))}
           </div>
@@ -2512,7 +2514,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.10</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.11</div>
     </div>
   </>);
 }
