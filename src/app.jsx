@@ -610,6 +610,14 @@ export default function App() {
     setIdeas((m) => { const n = { ...m }; delete n[id]; return n; });
     if (user) updateDoc(mainRef(), { [`ideas.${id}`]: deleteField() }).catch(console.error);
   };
+  const updIdea = (id, p) => {
+    const cur = ideas[id];
+    if (!cur) return;
+    const it = { ...cur, name: String(p.name || cur.name), style: p.style === undefined ? cur.style : (p.style || null), items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name) };
+    if (!it.items.length) return say("An idea needs at least one ingredient");
+    setIdeas((m) => ({ ...m, [id]: it }));
+    if (user) updateDoc(mainRef(), { [`ideas.${id}`]: it }).catch(console.error);
+  };
   const setWeight = (d, v) => { setWeightsMap((m) => ({ ...m, [d]: v })); if (user) updateDoc(mainRef(), { [`weights.${d}`]: v }).catch(console.error); };
   const delWeight = (d) => { setWeightsMap((m) => { const n = { ...m }; delete n[d]; return n; }); if (user) updateDoc(mainRef(), { [`weights.${d}`]: deleteField() }).catch(console.error); };
   const setSteps = (d, n) => {
@@ -842,7 +850,7 @@ export default function App() {
           })}
         </>}
 
-        {tab === "diet" && <DietTab T={T} S={S} settings={settings} viewDate={date} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} ideas={ideas} addIdea={addIdea} delIdea={delIdea} logMany={logMany} goLibrary={() => setTab("library")} say={say} />}
+        {tab === "diet" && <DietTab T={T} S={S} settings={settings} viewDate={date} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} ideas={ideas} addIdea={addIdea} updIdea={updIdea} delIdea={delIdea} logMany={logMany} goLibrary={() => setTab("library")} say={say} />}
         {tab === "trends" && <Trends T={T} S={S} logCals={logCals} settings={settings} weightsMap={weightsMap} setWeight={setWeight} delWeight={delWeight} stepsMap={stepsMap} setSteps={setSteps} delSteps={delSteps} tdee={tdee} openDay={openDay} say={say} />}
         {tab === "library" && <Library T={T} S={S} foods={foods} patchFood={patchFood} deleteFood={deleteFood} onLog={(f) => setSheet({ meal: autoMeal(), tab: "search", pre: f })} openEditor={(f) => setTagFood(f)} openRecipe={() => setRecipeOpen({})} openQuick={() => setQuickOpen(true)} say={say} />}
         {tab === "settings" && <Settings T={T} S={S} settings={settings} persistSettings={persistSettings} gramTargets={gramTargets} user={user} say={say} />}
@@ -929,7 +937,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.7</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.8</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1496,10 +1504,31 @@ function GroupDetail({ T, gid, weekDates, dayTags, user, close }) {
   </div>);
 }
 
+function foodTokens(str) {
+  return String(str || "").toLowerCase().replace(/[^a-z0-9%\s]/g, " ").split(/\s+/).filter((w) => w && !["the", "and", "with", "of", "a", "an", "style"].includes(w));
+}
+function tokEq(a, b) {
+  if (a === b) return true;
+  const sa = a.replace(/ies$/, "y").replace(/s$/, "");
+  const sb = b.replace(/ies$/, "y").replace(/s$/, "");
+  if (sa === sb) return true;
+  return (a.length >= 5 && b.startsWith(a)) || (b.length >= 5 && a.startsWith(b));
+}
 function findFood(foods, name) {
   const nm = String(name || "").toLowerCase().trim();
   if (!nm) return null;
-  return foods.find((x) => x.name.toLowerCase() === nm) || foods.find((x) => x.name.toLowerCase().includes(nm)) || foods.find((x) => nm.includes(x.name.toLowerCase())) || null;
+  const exact = foods.find((x) => x.name.toLowerCase() === nm);
+  if (exact) return exact;
+  const q = foodTokens(nm);
+  if (!q.length) return null;
+  // every word of the ingredient must appear in the food's name — brands and extra words are fine
+  const cands = foods.filter((f) => {
+    const ft = foodTokens(f.name);
+    return q.every((qt) => ft.some((t) => tokEq(qt, t)));
+  });
+  if (!cands.length) return foods.find((x) => x.name.toLowerCase().includes(nm)) || foods.find((x) => nm.includes(x.name.toLowerCase())) || null;
+  cands.sort((a, b) => ((b.have ? 1 : 0) - (a.have ? 1 : 0)) || ((b.uses || 0) - (a.uses || 0)) || (a.name.length - b.name.length));
+  return cands[0];
 }
 
 const IDEA_SCHEMA = `{"name": "short dish name", "style": "cuisine or restaurant vibe, or null", "items": [{"name": "one component food, generic (e.g. sourdough bread, greek yogurt, banana)", "srv": rough number of servings}]}`;
@@ -1517,11 +1546,13 @@ async function parseIdeaImage(base64, mediaType) {
   return extractJSON(txt);
 }
 
-function IdeaSaveSheet({ T, onSave, close, say }) {
+function IdeaSaveSheet({ T, editing, onSave, close, say }) {
   const [mode, setMode] = useState("text");
   const [desc, setDesc] = useState("");
   const [busy, setBusy] = useState(false);
-  const [prev, setPrev] = useState(null);
+  const [prev, setPrev] = useState(editing ? { name: editing.name, style: editing.style || null, items: (editing.items || []).map((it) => ({ name: it.name, srv: it.srv })) } : null);
+  const [newIng, setNewIng] = useState("");
+  const addIng = () => { const n = newIng.trim(); if (!n || !prev) return; setPrev({ ...prev, items: [...prev.items, { name: n, srv: 1 }] }); setNewIng(""); };
   const camRef = useRef();
   const upRef = useRef();
   const norm = (o) => ({ name: String(o.name || "Meal idea"), style: o.style || null, items: (o.items || []).map((it) => ({ name: String(it.name || "").trim(), srv: +it.srv > 0 ? rnd(+it.srv, 2) : 1 })).filter((it) => it.name) });
@@ -1545,7 +1576,7 @@ function IdeaSaveSheet({ T, onSave, close, say }) {
   const sh = { background: T.bg, width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", borderRadius: "18px 18px 0 0", padding: "16px 16px calc(env(safe-area-inset-bottom) + 16px)" };
   return (<div style={ov} onClick={close}><div style={sh} onClick={(e) => e.stopPropagation()}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ fontWeight: 700, fontSize: 15 }}>Save a meal to try</span>
+      <span style={{ fontWeight: 700, fontSize: 15 }}>{editing ? "Edit idea" : "Save a meal to try"}</span>
       <button onClick={close} style={{ ...pill(T), padding: "6px 10px" }}>✕</button>
     </div>
     {!prev && <>
@@ -1571,24 +1602,34 @@ function IdeaSaveSheet({ T, onSave, close, say }) {
       <input value={prev.name} onChange={(e) => setPrev({ ...prev, name: e.target.value })} style={{ ...inp(T), fontWeight: 700 }} />
       {prev.items.map((it, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
         <span style={{ flex: 1, fontSize: 13, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</span>
-        <span style={{ fontSize: 11.5, color: T.mut }}>×{it.srv}</span>
+        <input type="number" inputMode="decimal" step="any" min="0" value={it.srv}
+          onChange={(e) => { const v = e.target.value; setPrev((p) => ({ ...p, items: p.items.map((x, j) => (j === i ? { ...x, srv: v } : x)) })); }}
+          onBlur={() => setPrev((p) => ({ ...p, items: p.items.map((x, j) => (j === i ? { ...x, srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 } : x)) }))}
+          style={{ ...inp(T), width: 58, textAlign: "center", padding: "6px 4px", fontSize: 13 }} />
+        <span style={{ fontSize: 11, color: T.mut }}>srv</span>
         <button onClick={() => setPrev({ ...prev, items: prev.items.filter((_, j) => j !== i) })} style={{ ...btn(T), color: T.mut }}>✕</button>
       </div>))}
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <input placeholder="Add ingredient (e.g. honey)" value={newIng} onChange={(e) => setNewIng(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addIng()} style={inp(T)} />
+        <button onClick={addIng} style={{ ...pill(T), flexShrink: 0 }}>Add</button>
+      </div>
+      <div style={{ fontSize: 10.5, color: T.mut, marginTop: 6 }}>Keep ingredient names generic ("chicken breast", not a brand) — any product in your library that fits will count, and checked ✓ ones win.</div>
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-        <button onClick={() => setPrev(null)} style={{ ...pill(T), flex: 1 }}>Back</button>
-        <button onClick={save} style={{ ...pill(T), flex: 2, background: T.mint, color: "#fff", borderColor: T.mint }}>Save to try</button>
+        {!editing && <button onClick={() => setPrev(null)} style={{ ...pill(T), flex: 1 }}>Back</button>}
+        <button onClick={save} style={{ ...pill(T), flex: 2, background: T.mint, color: "#fff", borderColor: T.mint }}>{editing ? "Save changes" : "Save to try"}</button>
       </div>
     </div>}
   </div></div>);
 }
 
-function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets, foods, ideas, addIdea, delIdea, logMany, goLibrary, say }) {
+function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets, foods, ideas, addIdea, updIdea, delIdea, logMany, goLibrary, say }) {
   const stock = useMemo(() => foods.filter((f) => f.have), [foods]);
   const [style, setStyle] = useState("any");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
   const lastNames = useRef([]);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [editIdea, setEditIdea] = useState(null);
 
   const ideaList = useMemo(() => Object.values(ideas || {}).map((idea) => {
     const rows = (idea.items || []).map((it) => { const f = findFood(foods, it.name); return { ...it, food: f, have: !!(f && f.have) }; });
@@ -1720,6 +1761,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
         <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           {ready ? <span style={{ fontSize: 10.5, fontWeight: 700, color: T.mint, background: T.mintSoft, borderRadius: 8, padding: "3px 8px" }}>Ready</span>
             : <span style={{ fontSize: 10.5, color: T.amber, fontWeight: 600 }}>{missing.length} short</span>}
+          <button onClick={() => setEditIdea(idea)} style={{ ...btn(T), color: T.mut, minWidth: 26, height: 26 }}>✎</button>
           <button onClick={() => { delIdea(idea.id); say("Removed"); }} style={{ ...btn(T), color: T.mut, minWidth: 26, height: 26 }}>✕</button>
         </span>
       </div>
@@ -1745,6 +1787,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
     </div>}
 
     {saveOpen && <IdeaSaveSheet T={T} onSave={(p) => { addIdea({ ...p, src: "manual" }); say("Saved to try"); }} close={() => setSaveOpen(false)} say={say} />}
+    {editIdea && <IdeaSaveSheet T={T} editing={editIdea} onSave={(p) => { updIdea(editIdea.id, p); say("Idea updated"); }} close={() => setEditIdea(null)} say={say} />}
   </>);
 }
 
@@ -2379,7 +2422,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.7</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.8</div>
     </div>
   </>);
 }
