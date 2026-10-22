@@ -515,7 +515,7 @@ export default function App() {
       (Array.isArray(specs) ? specs : [specs]).forEach((sp) => {
         const name = String(sp.name || "").trim();
         if (!name || Object.values(ideas).find((x) => x.name.toLowerCase() === name.toLowerCase())) return;
-        addIdea({ name, style: sp.style || null, kind: sp.kind || null, slot: sp.slot || null, items: sp.items, src: "import" });
+        addIdea({ name, style: sp.style || null, kind: sp.kind || null, slot: sp.slot || null, store: sp.store || null, items: sp.items, src: "import" });
         n++;
       });
       if (n) say(`📌 ${n} idea${n === 1 ? "" : "s"} saved to try`);
@@ -601,7 +601,7 @@ export default function App() {
   const setFoodTags = (id, tags) => patchFood(id, { tags });
   const deleteFood = (id) => { setFoods((fs) => fs.filter((x) => x.id !== id)); if (user) deleteDoc(doc(db, "fuel_users", user.uid, "foods", id)).catch(console.error); };
   const addIdea = (p) => {
-    const it = { id: uid(), name: String(p.name || "Meal idea"), style: p.style || null, items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name), kind: p.kind || null, slot: p.slot || null, src: p.src || "manual", added: Date.now() };
+    const it = { id: uid(), name: String(p.name || "Meal idea"), style: p.style || null, items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name), kind: p.kind || null, slot: p.slot || null, store: p.store || null, src: p.src || "manual", added: Date.now() };
     if (!it.items.length) return;
     setIdeas((m) => ({ ...m, [it.id]: it }));
     if (user) updateDoc(mainRef(), { [`ideas.${it.id}`]: it }).catch(console.error);
@@ -613,7 +613,7 @@ export default function App() {
   const updIdea = (id, p) => {
     const cur = ideas[id];
     if (!cur) return;
-    const it = { ...cur, name: String(p.name || cur.name), style: p.style === undefined ? cur.style : (p.style || null), items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name), kind: p.kind || null, slot: p.slot || null };
+    const it = { ...cur, name: String(p.name || cur.name), style: p.style === undefined ? cur.style : (p.style || null), items: (p.items || []).map((x) => ({ name: String(x.name || "").trim(), srv: +x.srv > 0 ? rnd(+x.srv, 2) : 1 })).filter((x) => x.name), kind: p.kind || null, slot: p.slot || null, store: p.store || null };
     if (!it.items.length) return say("An idea needs at least one ingredient");
     setIdeas((m) => ({ ...m, [id]: it }));
     if (user) updateDoc(mainRef(), { [`ideas.${id}`]: it }).catch(console.error);
@@ -937,7 +937,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.14</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.15</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1571,7 +1571,7 @@ function IdeaSaveSheet({ T, foods, editing, onSave, close, say }) {
   const [mode, setMode] = useState("text");
   const [desc, setDesc] = useState("");
   const [busy, setBusy] = useState(false);
-  const [prev, setPrev] = useState(editing ? { name: editing.name, style: editing.style || null, kind: editing.kind || null, slot: editing.slot || null, items: (editing.items || []).map((it) => ({ name: it.name, srv: it.srv })) } : null);
+  const [prev, setPrev] = useState(editing ? { name: editing.name, style: editing.style || null, kind: editing.kind || null, slot: editing.slot || null, store: editing.store || null, items: (editing.items || []).map((it) => ({ name: it.name, srv: it.srv })) } : null);
   const [newIng, setNewIng] = useState("");
   const addIng = () => { const n = newIng.trim(); if (!n || !prev) return; setPrev({ ...prev, items: [...prev.items, { name: n, srv: 1 }] }); setNewIng(""); };
   const sugg = useMemo(() => {
@@ -1626,7 +1626,7 @@ function IdeaSaveSheet({ T, foods, editing, onSave, close, say }) {
         </div>
         <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Screenshots from eating videos work — calorie overlays get ignored.</div>
       </>}
-      <button onClick={() => setPrev({ name: "", style: null, kind: null, slot: null, items: [] })} style={{ ...pill(T), width: "100%", marginTop: 10, background: "transparent", borderStyle: "dashed" }}>✎ Start from scratch — pick items yourself</button>
+      <button onClick={() => setPrev({ name: "", style: null, kind: null, slot: null, store: null, items: [] })} style={{ ...pill(T), width: "100%", marginTop: 10, background: "transparent", borderStyle: "dashed" }}>✎ Start from scratch — pick items yourself</button>
     </>}
     {prev && <div style={{ marginTop: 12 }}>
       <input placeholder="Name the meal (e.g. Chicken alfredo bowl)" value={prev.name} onChange={(e) => setPrev({ ...prev, name: e.target.value })} style={{ ...inp(T), fontWeight: 700 }} />
@@ -1665,6 +1665,11 @@ function IdeaSaveSheet({ T, foods, editing, onSave, close, say }) {
         {[[null, "Auto"], ["breakfast", "Bfast"], ["main", "Main"], ["snack", "Snack"], ["dessert", "Dsrt"], ["preworkout", "PreWO"]].map(([k, l]) => (
           <button key={l} onClick={() => setPrev({ ...prev, slot: k })} style={{ ...pill(T), flex: 1, padding: "5px 2px", fontSize: 11, background: (prev.slot || null) === k ? T.mintSoft : T.cardAlt, color: (prev.slot || null) === k ? T.mint : T.sub, borderColor: (prev.slot || null) === k ? T.mint : T.border }}>{l}</button>))}
       </div>
+      <div style={{ display: "flex", gap: 5, marginTop: 6, alignItems: "center" }}>
+        <span style={{ fontSize: 11, color: T.mut, width: 32, flexShrink: 0 }}>Store</span>
+        {[[null, "Any"], ["tj", "Trader Joe's"]].map(([k, l]) => (
+          <button key={l} onClick={() => setPrev({ ...prev, store: k })} style={{ ...pill(T), flex: 1, padding: "5px 2px", fontSize: 11, background: (prev.store || null) === k ? T.mintSoft : T.cardAlt, color: (prev.store || null) === k ? T.mint : T.sub, borderColor: (prev.store || null) === k ? T.mint : T.border }}>{l}</button>))}
+      </div>
       <div style={{ fontSize: 10.5, color: T.mut, marginTop: 6 }}>Keep ingredient names generic ("chicken breast", not a brand) — any product in your library that fits will count, and checked ✓ ones win.</div>
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         {!editing && <button onClick={() => setPrev(null)} style={{ ...pill(T), flex: 1 }}>Back</button>}
@@ -1677,6 +1682,7 @@ function IdeaSaveSheet({ T, foods, editing, onSave, close, say }) {
 function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets, foods, ideas, addIdea, updIdea, delIdea, logMany, goLibrary, say }) {
   const stock = useMemo(() => foods.filter((f) => f.have), [foods]);
   const [style, setStyle] = useState("any");
+  const [genStore, setGenStore] = useState("any");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
   const lastNames = useRef([]);
@@ -1685,6 +1691,8 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
   const [openIdeas, setOpenIdeas] = useState({});
   const [ideaFilter, setIdeaFilter] = useState("all");
   const [ideaSort, setIdeaSort] = useState("ready");
+  const [buyStore, setBuyStore] = useState("all");
+  const [logPick, setLogPick] = useState(null);
 
   const ideaList = useMemo(() => Object.values(ideas || {}).map((idea) => {
     const rows = (idea.items || []).map((it) => { const f = findFood(foods, it.name); return { ...it, food: f, have: !!(f && f.have) }; });
@@ -1700,6 +1708,7 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
     let L = ideaList;
     if (ideaFilter === "buy") return [];
     if (ideaFilter === "sweet" || ideaFilter === "savory") L = L.filter((x) => x.kind === ideaFilter);
+    else if (ideaFilter === "tj") L = L.filter((x) => x.idea.store === "tj");
     else if (ideaFilter !== "all") L = L.filter((x) => x.slot === ideaFilter);
     const by = {
       ready: (a, b) => (b.ready - a.ready) || ((b.idea.added || 0) - (a.idea.added || 0)),
@@ -1713,15 +1722,17 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
 
   const shopList = useMemo(() => {
     const m = {};
-    ideaList.forEach(({ idea, missing }) => missing.forEach((r) => {
+    const src = buyStore === "tj" ? ideaList.filter((x) => x.idea.store === "tj") : ideaList;
+    src.forEach(({ idea, missing }) => missing.forEach((r) => {
       const label = r.food ? r.food.name : titleCase(r.name);
       const k = label.toLowerCase();
-      if (!m[k]) m[k] = { label, count: 0, completes: null, inLib: !!r.food };
+      if (!m[k]) m[k] = { label, count: 0, completes: null, inLib: !!r.food, ideas: [] };
       m[k].count++;
+      m[k].ideas.push(idea.name);
       if (missing.length === 1) m[k].completes = idea.name;
     }));
     return Object.values(m).sort((a, b) => ((b.completes ? 1 : 0) - (a.completes ? 1 : 0)) || (b.count - a.count)).slice(0, 10);
-  }, [ideaList]);
+  }, [ideaList, buyStore]);
 
   const calLeft = Math.max(0, settings.calTarget - todayCals);
   const pLeft = Math.max(0, gramTargets.p - Math.round(todayP));
@@ -1740,7 +1751,7 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
   const target = Math.min(hiCap, Math.max(450, budgetCal || 650));
 
   const gen = async () => {
-    if (stock.length < 3) return say("First tap ✓ on foods you have, in the Library tab");
+    if (genStore !== "tj" && stock.length < 3) return say("First tap ✓ on foods you have, in the Library tab");
     setBusy(true);
     try {
       const inv = stock.slice(0, 90).map((f) => `${f.name} [${f.serving}] ${Math.round(f.cal)}cal ${Math.round(f.p)}P`).join("\n");
@@ -1754,7 +1765,8 @@ function DietTab({ T, S, settings, viewDate, day, todayCals, todayP, gramTargets
         : "He is on a calorie cut: keep meals filling for their calories and push protein hard.";
       const staples = foods.filter((f) => (f.uses || 0) > 2).sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).map((f) => f.name).join(", ");
       const savedNames = Object.values(ideas || {}).map((x) => x.name).slice(0, 12).join("; ");
-      const extra = `${staples ? ` His proven staples (familiar is fine, novelty wins): ${staples}.` : ""}${savedNames ? ` He already saved these to try, so suggest different things: ${savedNames}.` : ""}`;
+      const storeLine = genStore === "tj" ? ` Build every meal around real Trader Joe's products, named as they appear in store with a "TJ's" prefix (e.g. TJ's Chicken Shawarma Thighs, TJ's Cauliflower Gnocchi, TJ's Chili Onion Crunch). Prefer AVAILABLE items where they genuinely fit, and list every TJ product that is NOT in AVAILABLE in that meal's "missing" array — that becomes his shopping list. Favor TJ products that could serve several different meals.` : "";
+      const extra = `${staples ? ` His proven staples (familiar is fine, novelty wins): ${staples}.` : ""}${savedNames ? ` He already saved these to try, so suggest different things: ${savedNames}.` : ""}${storeLine}`;
       const prompt = `You generate meal inspiration for a home cook who cooks WITHOUT oil (air fryer, oven, dry nonstick pan) and wants meals that feel like ordering out so he can practice recreating them at home. ${goalLine}
 
 AVAILABLE (everything he has on hand — pantry, freezer and fresh produce — with per-serving nutrition):
@@ -1781,8 +1793,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       else misses.push(it.food);
     });
     if (!pairs.length) return say("Couldn't match those items to your library");
-    logMany(pairs, nextSlot);
-    if (misses.length) say(`Logged ${pairs.length} — no match for: ${misses.join(", ")}`, 5000);
+    setLogPick({ pairs, misses });
   };
 
   return (<>
@@ -1797,6 +1808,11 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       <div style={{ display: "flex", gap: 5, marginTop: 10 }}>
         {[["any", "Any"], ["savory", "Savory"], ["sweet", "Sweet"]].map(([k, l]) => (
           <button key={k} onClick={() => setStyle(k)} style={{ ...pill(T), flex: 1, padding: "7px 2px", fontSize: 12, background: style === k ? T.mintSoft : T.cardAlt, color: style === k ? T.mint : T.sub, borderColor: style === k ? T.mint : T.border }}>{l}</button>))}
+      </div>
+      <div style={{ display: "flex", gap: 5, marginTop: 6, alignItems: "center" }}>
+        <span style={{ fontSize: 11, color: T.mut, flexShrink: 0 }}>Shop</span>
+        {[["any", "My kitchen"], ["tj", "Trader Joe's run"]].map(([k, l]) => (
+          <button key={k} onClick={() => setGenStore(k)} style={{ ...pill(T), flex: 1, padding: "6px 2px", fontSize: 11.5, background: genStore === k ? T.mintSoft : T.cardAlt, color: genStore === k ? T.mint : T.sub, borderColor: genStore === k ? T.mint : T.border }}>{l}</button>))}
       </div>
       <button onClick={gen} disabled={busy} style={{ ...pill(T), width: "100%", marginTop: 10, padding: "11px", background: busy ? T.cardAlt : T.mint, color: busy ? T.sub : "#fff", borderColor: busy ? T.border : T.mint }}>{busy ? "Dreaming up meals…" : res ? "✨ New ideas" : "✨ Generate 3 meal ideas"}</button>
       {stock.length === 0 && !res && <div style={{ fontSize: 11.5, color: T.mut, marginTop: 8 }}>Ideas build from what you've marked ✓ in your Library — pantry, freezer, and fresh produce alike. Tap the counter above to go check things off.</div>}
@@ -1814,8 +1830,8 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       </div>
       {m.how && <div style={{ fontSize: 11.5, color: T.mut, marginTop: 7, fontStyle: "italic" }}>{m.how}</div>}
       <div style={{ display: "flex", gap: 8, marginTop: 9 }}>
-        <button onClick={() => { addIdea({ name: m.name, style: m.style || null, items: (m.items || []).map((it) => ({ name: it.food, srv: +it.srv > 0 ? +it.srv : 1 })), src: "gen" }); say("Saved to try"); }} style={{ ...pill(T), flex: 1, padding: "8px", fontSize: 12 }}>☆ Save</button>
-        <button onClick={() => logIdea(m)} style={{ ...pill(T), flex: 2, padding: "8px", fontSize: 12, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items → {mealMeta.label}</button>
+        <button onClick={() => { addIdea({ name: m.name, style: m.style || null, store: genStore === "tj" ? "tj" : null, items: [...(m.items || []).map((it) => ({ name: it.food, srv: +it.srv > 0 ? +it.srv : 1 })), ...(m.missing || []).map((n) => ({ name: n, srv: 1 }))], src: "gen" }); say("Saved to try"); }} style={{ ...pill(T), flex: 1, padding: "8px", fontSize: 12 }}>☆ Save</button>
+        <button onClick={() => logIdea(m)} style={{ ...pill(T), flex: 2, padding: "8px", fontSize: 12, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log items to… ▾</button>
       </div>
     </div>))}
     {res && res.buy && <div style={{ ...S.card, marginTop: 10, padding: "10px 14px" }}>
@@ -1830,7 +1846,7 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
       <div style={{ fontSize: 12, color: T.mut }}>See a meal in a video you want to recreate? Save it here — typed or straight from a screenshot — and Fuel tracks when you have everything to make it.</div>
     </div>}
     {ideaList.length > 0 && <div style={{ display: "flex", gap: 5, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
-      {[["all", "All"], ["breakfast", "Bfast"], ["main", "Mains"], ["snack", "Snacks"], ["dessert", "Dessert"], ["preworkout", "Pre WO"], ["savory", "Savory"], ["sweet", "Sweet"], ["buy", `🛒 Buy${shopList.length ? ` · ${shopList.length}` : ""}`]].map(([k, l]) => (
+      {[["all", "All"], ["breakfast", "Bfast"], ["main", "Mains"], ["snack", "Snacks"], ["dessert", "Dessert"], ["preworkout", "Pre WO"], ["savory", "Savory"], ["sweet", "Sweet"], ["tj", "TJ's"], ["buy", `🛒 Buy${shopList.length ? ` · ${shopList.length}` : ""}`]].map(([k, l]) => (
         <button key={k} onClick={() => setIdeaFilter(k)} style={{ ...pill(T), padding: "5px 9px", fontSize: 11, background: ideaFilter === k ? T.mintSoft : T.cardAlt, color: ideaFilter === k ? T.mint : T.sub, borderColor: ideaFilter === k ? T.mint : T.border }}>{l}</button>))}
       <select value={ideaSort} onChange={(e) => setIdeaSort(e.target.value)} style={{ ...inp(T), width: "auto", padding: "5px 8px", fontSize: 11, marginLeft: "auto" }}>
         <option value="ready">Ready first</option>
@@ -1847,20 +1863,21 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
         <div onClick={() => setOpenIdeas((m) => ({ ...m, [idea.id]: !m[idea.id] }))} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <span style={{ fontSize: 13.5, fontWeight: 700, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{open ? "▾" : "▸"} {idea.name}</span>
           <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {idea.store === "tj" && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#C8102E", background: "rgba(200,16,46,.12)", borderRadius: 6, padding: "2px 5px" }}>TJ</span>}
             {calEst > 0 && <span style={{ fontSize: 11, color: T.mut }}>~{fmtN(calEst)}{partial ? "+" : ""} cal</span>}
             {ready ? <span style={{ fontSize: 10.5, fontWeight: 700, color: T.mint, background: T.mintSoft, borderRadius: 8, padding: "3px 8px" }}>Ready</span>
               : <span style={{ fontSize: 10.5, color: T.amber, fontWeight: 600 }}>{missing.length} short</span>}
           </span>
         </div>
         {open && <>
-          <div style={{ fontSize: 10.5, color: T.mut, marginTop: 3 }}>{idea.style ? `${idea.style} · ` : ""}{kind} · {slot === "preworkout" ? "pre workout" : slot}</div>
+          <div style={{ fontSize: 10.5, color: T.mut, marginTop: 3 }}>{idea.store === "tj" ? "TJ's · " : ""}{idea.style ? `${idea.style} · ` : ""}{kind} · {slot === "preworkout" ? "pre workout" : slot}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 11.5, marginTop: 7 }}>
             {rows.map((r, j) => (<span key={j} style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: r.have ? T.sub : T.amber }}>{r.have ? "✓" : "🛒"} {r.food ? r.food.name : r.name} <span style={{ color: T.mut }}>×{rnd(r.srv, 2)}</span></span>))}
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <button onClick={() => setEditIdea(idea)} style={{ ...pill(T), flex: 1, padding: "7px", fontSize: 11.5 }}>✎ Edit</button>
             <button onClick={() => { delIdea(idea.id); say("Removed"); }} style={{ ...pill(T), flex: 1, padding: "7px", fontSize: 11.5, color: T.red, borderColor: T.red, background: "transparent" }}>Remove</button>
-            {ready && <button onClick={() => logMany(rows.map((r) => ({ food: r.food, qty: +r.srv > 0 ? +r.srv : 1 })), nextSlot)} style={{ ...pill(T), flex: 2, padding: "7px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log → {mealMeta.label}</button>}
+            {ready && <button onClick={() => setLogPick({ pairs: rows.map((r) => ({ food: r.food, qty: +r.srv > 0 ? +r.srv : 1 })), misses: [] })} style={{ ...pill(T), flex: 2, padding: "7px", fontSize: 11.5, color: T.mint, borderColor: T.mint, background: "transparent" }}>Log to… ▾</button>}
           </div>
         </>}
       </div>);
@@ -1869,18 +1886,26 @@ Respond ONLY with JSON, no markdown: {"meals":[{"name":string,"style":string,"it
     {ideaFilter === "buy" && <div style={{ ...S.card, marginTop: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontWeight: 700, fontSize: 14 }}>🛒 Buy next</span>
-        <span style={{ fontSize: 10.5, color: T.mut }}>ranked by what each unlocks</span>
+        <div style={{ display: "flex", gap: 5 }}>
+          {[["all", "All stores"], ["tj", "TJ's run"]].map(([k, l]) => (
+            <button key={k} onClick={() => setBuyStore(k)} style={{ ...pill(T), padding: "4px 9px", fontSize: 10.5, background: buyStore === k ? T.mintSoft : T.cardAlt, color: buyStore === k ? T.mint : T.sub, borderColor: buyStore === k ? T.mint : T.border }}>{l}</button>))}
+        </div>
       </div>
+      <div style={{ fontSize: 10.5, color: T.mut, marginTop: 3 }}>ranked by how many saved meals each item serves</div>
       {shopList.length === 0 && <div style={{ fontSize: 12, color: T.mut, marginTop: 8 }}>Nothing to buy — every saved idea is fully stocked.</div>}
       <div style={{ marginTop: 4 }}>
-        {shopList.map((x, i) => (<button key={i} onClick={goLibrary} style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", padding: "8px 0", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", color: T.text, textAlign: "left" }}>
-          <span style={{ fontSize: 13, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.label}{x.inLib ? "" : " *"}</span>
-          <span style={{ fontSize: 11, color: x.completes ? T.mint : T.sub, fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>{x.completes ? `completes ${x.completes}` : `in ${x.count} idea${x.count === 1 ? "" : "s"}`}</span>
+        {shopList.map((x, i) => (<button key={i} onClick={goLibrary} style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 0", background: "none", border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", color: T.text, textAlign: "left" }}>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.label}{x.inLib ? "" : " *"}</span>
+            <span style={{ display: "block", fontSize: 10, color: T.mut, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.ideas.slice(0, 3).join(", ")}{x.ideas.length > 3 ? ` +${x.ideas.length - 3}` : ""}</span>
+          </span>
+          <span style={{ fontSize: 11, color: x.completes ? T.mint : T.sub, fontWeight: 600, flexShrink: 0 }}>{x.completes ? `completes ${x.completes}` : `${x.count} meal${x.count === 1 ? "" : "s"}`}</span>
         </button>))}
       </div>
       <div style={{ fontSize: 10.5, color: T.mut, marginTop: 8 }}>Bought something? Check it ✓ in Library (tap a row to jump there). Items marked * aren't in your library yet — scan the label once when you buy.</div>
     </div>}
 
+    {logPick && <ActionMenu T={T} title="Log items to…" actions={MEALS.map((m) => ({ label: `${m.icon} ${m.label}${m.key === nextSlot ? " · next up" : ""}`, onTap: () => { logMany(logPick.pairs, m.key); if ((logPick.misses || []).length) say(`Logged — no match for: ${logPick.misses.join(", ")}`, 5000); setLogPick(null); } }))} close={() => setLogPick(null)} />}
     {saveOpen && <IdeaSaveSheet T={T} foods={foods} onSave={(p) => { addIdea({ ...p, src: "manual" }); say("Saved to try"); }} close={() => setSaveOpen(false)} say={say} />}
     {editIdea && <IdeaSaveSheet T={T} foods={foods} editing={editIdea} onSave={(p) => { updIdea(editIdea.id, p); say("Idea updated"); }} close={() => setEditIdea(null)} say={say} />}
   </>);
@@ -2517,7 +2542,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.14</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.15</div>
     </div>
   </>);
 }
