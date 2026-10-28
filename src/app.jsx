@@ -153,10 +153,10 @@ async function suggestForGaps(summary) {
   return extractJSON(txt);
 }
 
-async function usdaSearch(q) {
+async function usdaSearch(q, generic = false) {
   if (!CFG.usdaKey) return [];
   try {
-    const r = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(CFG.usdaKey)}&query=${encodeURIComponent(q)}&pageSize=8&dataType=Foundation,SR%20Legacy,Branded`);
+    const r = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(CFG.usdaKey)}&query=${encodeURIComponent(q)}&pageSize=8&dataType=${generic ? "Foundation,SR%20Legacy" : "Foundation,SR%20Legacy,Branded"}`);
     const j = await r.json();
     return (j.foods || []).map((fd) => {
       const n = {}; (fd.foodNutrients || []).forEach((x) => { if (n[x.nutrientId] == null) n[x.nutrientId] = x.value; });
@@ -596,7 +596,13 @@ export default function App() {
       updateDoc(mainRef(), { [`logcals.${date}`]: c, [`daytags.${date}`]: tags }).catch(console.error);
     }
   };
-  const addFoodToLib = (f) => { setFoods((fs) => (fs.find((x) => x.id === f.id) ? fs : [...fs, f])); if (user) setDoc(doc(db, "fuel_users", user.uid, "foods", f.id), f).catch(console.error); };
+  const addFoodToLib = (f) => {
+    setFoods((fs) => (fs.find((x) => x.id === f.id) ? fs : [...fs, f]));
+    if (user) setDoc(doc(db, "fuel_users", user.uid, "foods", f.id), f).catch(console.error);
+    if (CFG.usdaKey && f.kind !== "recipe" && microsSparse(f) && servG(f)) {
+      enrichFromUSDA(f).then((r) => { if (r.ok && r.filled > 0) patchFood(f.id, { micros: r.micros, ...(r.fiber != null ? { fiber: r.fiber } : {}), mFill: true }); }).catch(() => {});
+    }
+  };
   const patchFood = (id, patch) => { setFoods((fs) => fs.map((x) => (x.id === id ? { ...x, ...patch } : x))); if (user) setDoc(doc(db, "fuel_users", user.uid, "foods", id), patch, { merge: true }).catch(console.error); };
   const setFoodTags = (id, tags) => patchFood(id, { tags });
   const deleteFood = (id) => { setFoods((fs) => fs.filter((x) => x.id !== id)); if (user) deleteDoc(doc(db, "fuel_users", user.uid, "foods", id)).catch(console.error); };
@@ -789,6 +795,13 @@ export default function App() {
                   </div>);
                 })}
               </div>
+              {(() => {
+                const ids = new Set();
+                MEALS.forEach(({ key }) => (day.meals[key] || []).forEach((e) => e.foodId && ids.add(e.foodId)));
+                let n = 0;
+                ids.forEach((id) => { const f = foods.find((x) => x.id === id); if (f && f.kind !== "recipe" && microsSparse(f)) n++; });
+                return n > 0 ? <div style={{ fontSize: 10.5, color: T.amber, marginTop: 10 }}>⚠ {n} food{n === 1 ? "" : "s"} eaten today {n === 1 ? "has" : "have"} thin micro data, so these totals run low. Fill the gaps in Settings → Micronutrients.</div> : null;
+              })()}
               <button onClick={(e) => { e.stopPropagation(); askAI(); }} style={{ ...pill(T), marginTop: 12, width: "100%" }}>{aiBusy ? "Thinking…" : "✨ What should I eat to fill my gaps?"}</button>
               {aiTips && <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                 {aiTips.map((t, i) => (<div key={i} style={{ background: T.cardAlt, borderRadius: 10, padding: "8px 10px" }}>
@@ -853,7 +866,7 @@ export default function App() {
         {tab === "diet" && <DietTab T={T} S={S} settings={settings} viewDate={date} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} ideas={ideas} addIdea={addIdea} updIdea={updIdea} delIdea={delIdea} logMany={logMany} goLibrary={() => setTab("library")} say={say} />}
         {tab === "trends" && <Trends T={T} S={S} logCals={logCals} settings={settings} weightsMap={weightsMap} setWeight={setWeight} delWeight={delWeight} stepsMap={stepsMap} setSteps={setSteps} delSteps={delSteps} tdee={tdee} openDay={openDay} say={say} />}
         {tab === "library" && <Library T={T} S={S} foods={foods} patchFood={patchFood} deleteFood={deleteFood} onLog={(f) => setSheet({ meal: autoMeal(), tab: "search", pre: f })} openEditor={(f) => setTagFood(f)} openRecipe={() => setRecipeOpen({})} openQuick={() => setQuickOpen(true)} say={say} />}
-        {tab === "settings" && <Settings T={T} S={S} settings={settings} persistSettings={persistSettings} gramTargets={gramTargets} user={user} say={say} />}
+        {tab === "settings" && <Settings T={T} S={S} settings={settings} persistSettings={persistSettings} gramTargets={gramTargets} user={user} foods={foods} patchFood={patchFood} say={say} />}
       </div>
 
       <button onClick={() => setSheet({ meal: autoMeal(), tab: "search" })}
@@ -937,7 +950,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.15</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.16</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1504,6 +1517,52 @@ function GroupDetail({ T, gid, weekDates, dayTags, user, close }) {
   </div>);
 }
 
+function microsSparse(f) {
+  if (f.mFill) return false;
+  const m = f.micros || {};
+  let n = 0;
+  Object.keys(M0()).forEach((k) => { if (+m[k] > 0) n++; });
+  return n < 5;
+}
+
+function pickUsdaMatch(results, name) {
+  const base = String(name || "").toLowerCase();
+  const qt = foodTokens(base.split(",")[0]);
+  let best = null, bestScore = 0;
+  (results || []).forEach((r) => {
+    const rn = String(r.name || "").toLowerCase();
+    const rt = foodTokens(rn);
+    let shared = 0;
+    qt.forEach((t) => { if (rt.some((x) => tokEq(t, x))) shared++; });
+    if (!shared) return;
+    let score = shared * 10 - rt.length * 0.5;
+    if (base.includes("cook") && rn.includes("cook")) score += 4;
+    if (!base.includes("raw") && rn.includes("raw")) score -= 2;
+    if (score > bestScore) { bestScore = score; best = r; }
+  });
+  return best;
+}
+
+async function enrichFromUSDA(food) {
+  const g = servG(food);
+  if (!g) return { ok: false, why: "no-grams" };
+  const res = await usdaSearch(String(food.name || "").split(",")[0], true);
+  const best = pickUsdaMatch(res, food.name);
+  if (!best) return { ok: false, why: "no-match" };
+  const scale = g / 100;
+  const merged = { ...M0(), ...(food.micros || {}) };
+  let filled = 0;
+  Object.keys(M0()).forEach((k) => {
+    if ((+merged[k] || 0) === 0) {
+      const v = rnd((best.micros[k] || 0) * scale, 1);
+      if (v > 0) { merged[k] = v; filled++; }
+    }
+  });
+  let fiber = null;
+  if (!(+food.fiber > 0) && +best.fiber > 0) fiber = rnd(best.fiber * scale, 1);
+  return { ok: true, filled, micros: merged, fiber, match: best.name };
+}
+
 function foodTokens(str) {
   return String(str || "").toLowerCase().replace(/[^a-z0-9%\s]/g, " ").split(/\s+/).filter((w) => w && !["the", "and", "with", "of", "a", "an", "style"].includes(w));
 }
@@ -1936,11 +1995,29 @@ function TagEditor({ T, food, foods, setFoodTags, patchFood, openRecipeEdit, ope
     say("Nutrition scaled to the new amount");
   };
 
+  const [mBusy, setMBusy] = useState(false);
+  const [didFill, setDidFill] = useState(false);
+  const fillMicros = async () => {
+    if (!CFG.usdaKey) return say("Add a USDA key in index.html first");
+    setMBusy(true);
+    try {
+      const r = await enrichFromUSDA({ name, serving, gServ: +grams > 0 ? +grams : null, uServ: unitSel, micros: extras.micros, fiber: +vals.fiber || 0 });
+      if (!r.ok) say(r.why === "no-grams" ? "Set grams per serving first — USDA data scales by weight" : "No USDA match found for this name");
+      else if (r.filled === 0) { setDidFill(true); say("Micros already complete"); }
+      else {
+        setExtras((x) => ({ ...x, micros: r.micros }));
+        if (r.fiber != null && !(+vals.fiber > 0)) setVals((v) => ({ ...v, fiber: r.fiber }));
+        setDidFill(true);
+        say(`Filled ${r.filled} value${r.filled === 1 ? "" : "s"} from USDA (${r.match}) — Save to keep`, 4500);
+      }
+    } catch (e) { say(aiErrMsg(e, "USDA lookup failed")); }
+    setMBusy(false);
+  };
   const step = (k, d) => setTg((g) => { const v = Math.max(0, rnd((g[k] || 0) + d, 2)); const n = { ...g }; if (v === 0) delete n[k]; else n[k] = v; return n; });
 
   const save = () => {
     if (!name.trim()) return say("Name can't be empty");
-    patchFood(food.id, { name: name.trim(), serving: serving.trim() || "1 serving", gServ: gramsNum, uServ: gramsNum ? unitSel : food.uServ || null, cal: +vals.cal || 0, p: +vals.p || 0, c: +vals.c || 0, f: +vals.f || 0, fiber: +vals.fiber || 0, sugar: extras.sugar, satfat: extras.satfat, micros: extras.micros });
+    patchFood(food.id, { name: name.trim(), serving: serving.trim() || "1 serving", gServ: gramsNum, uServ: gramsNum ? unitSel : food.uServ || null, cal: +vals.cal || 0, p: +vals.p || 0, c: +vals.c || 0, f: +vals.f || 0, fiber: +vals.fiber || 0, sugar: extras.sugar, satfat: extras.satfat, micros: extras.micros, ...(didFill ? { mFill: true } : {}) });
     setFoodTags(food.id, { g: tg, pg: Math.max(0, Math.round(+pg || 0)), pl: pl.trim() || null, fv: fv.trim() || null });
     say("Food updated"); close();
   };
@@ -1974,6 +2051,7 @@ function TagEditor({ T, food, foods, setFoodTags, patchFood, openRecipeEdit, ope
           <input type="number" inputMode="decimal" value={vals[k]} onChange={(e) => setVals({ ...vals, [k]: e.target.value })} style={{ ...inp(T), padding: "8px 6px" }} />
         </div>))}
     </div>
+    <button onClick={fillMicros} disabled={mBusy} style={{ ...pill(T), width: "100%", marginTop: 8, fontSize: 12 }}>{mBusy ? "Looking up USDA…" : "🧪 Fill missing micros from USDA"}</button>
 
     {food.kind === "recipe" && <div style={{ marginTop: 14, background: T.bg2, borderRadius: 12, padding: "10px 12px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2453,13 +2531,14 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
   </div>);
 }
 
-function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
+function Settings({ T, S, settings, persistSettings, gramTargets, user, foods, patchFood, say }) {
   const up = (k, v) => persistSettings({ ...settings, [k]: v });
   const pctSum = settings.macroPct.p + settings.macroPct.c + settings.macroPct.f;
   const row = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${T.border}` };
   const numIn = { ...inp(T), width: 92, padding: "7px 10px", textAlign: "right" };
   const [pw, setPw] = useState("");
   const [pwBusy, setPwBusy] = useState(false);
+  const [fillBusy, setFillBusy] = useState(false);
   const pasteInto = async () => {
     try { const t = await navigator.clipboard.readText(); if (t) setPw(t.trim()); }
     catch { say("Clipboard blocked — long-press the field and choose Paste"); }
@@ -2538,11 +2617,39 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, say }) {
       <button onClick={testAI} style={{ ...pill(T), width: "100%", marginTop: 10 }}>Test AI connection</button>
     </div>
     <div style={{ ...S.card, marginTop: 10 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Micronutrients</div>
+      <div style={{ fontSize: 12, color: T.sub }}>Labels print only a few micronutrients, so scanned foods read zero on the rest and your daily totals run low. This fills the gaps from USDA generic data, scaled to each serving — it never changes values a label already set.</div>
+      {(() => {
+        const todo = foods.filter((f) => f.kind !== "recipe" && microsSparse(f) && servG(f) && ((f.uses || 0) > 0 || f.have || f.fav));
+        return (<>
+          <button onClick={async () => {
+            if (!CFG.usdaKey) return say("Add a USDA key in index.html first");
+            if (!todo.length) return say("Nothing to fill — tracked foods look complete");
+            if (fillBusy) return;
+            setFillBusy(true);
+            let done = 0, vals2 = 0, skip = 0;
+            for (const f of todo) {
+              try {
+                const r = await enrichFromUSDA(f);
+                if (r.ok && r.filled > 0) { patchFood(f.id, { micros: r.micros, ...(r.fiber != null ? { fiber: r.fiber } : {}), mFill: true }); vals2 += r.filled; done++; }
+                else { patchFood(f.id, { mFill: true }); skip++; }
+              } catch { skip++; }
+              if ((done + skip) % 5 === 0) say(`Filling micros… ${done + skip}/${todo.length}`);
+              await new Promise((res) => setTimeout(res, 350));
+            }
+            say(`Done: ${vals2} values filled across ${done} foods${skip ? ` · ${skip} had no gaps or no match` : ""}`, 7000);
+            setFillBusy(false);
+          }} disabled={fillBusy} style={{ ...pill(T), width: "100%", marginTop: 10 }}>{fillBusy ? "Filling — keep the app open…" : `🧪 Fill gaps in ${todo.length} tracked food${todo.length === 1 ? "" : "s"}`}</button>
+          <div style={{ fontSize: 10.5, color: T.mut, marginTop: 6 }}>Covers foods you've logged, starred, or checked ✓. New scans fill themselves automatically from now on. Recipes refresh when you re-save them.</div>
+        </>);
+      })()}
+    </div>
+    <div style={{ ...S.card, marginTop: 10 }}>
       <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>Account</div>
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.15</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.16</div>
     </div>
   </>);
 }
