@@ -387,6 +387,7 @@ export default function App() {
   const [mealSum, setMealSum] = useState(null);
   const [mealCopy, setMealCopy] = useState(null);
   const [nutrDetail, setNutrDetail] = useState(null);
+  const [mealSend, setMealSend] = useState(null);
   const [tagFood, setTagFood] = useState(null);
   const [mealMenu, setMealMenu] = useState(null);
 
@@ -668,6 +669,21 @@ export default function App() {
   const setWater = (oz) => saveDay({ ...day, water: Math.max(0, oz) });
   const openDay = (d) => { setDate(d); setTab("today"); setDpOpen(false); };
 
+  const appendToDay = async (d, mealKey, entries) => {
+    if (d === date) {
+      saveDay({ ...day, meals: { ...day.meals, [mealKey]: [...day.meals[mealKey], ...entries] } });
+      return;
+    }
+    const dd = await getDoc(doc(db, "fuel_users", user.uid, "days", d));
+    const nd = dd.exists() ? dd.data() : emptyDay();
+    nd.meals[mealKey] = [...(nd.meals[mealKey] || []), ...entries];
+    const c = Math.round(dayTotals(nd).cal);
+    const tags = dayTagTotals(nd, MEALS);
+    setLogCals((p) => ({ ...p, [d]: c }));
+    setDayTags((p) => ({ ...p, [d]: tags }));
+    await setDoc(doc(db, "fuel_users", user.uid, "days", d), nd);
+    updateDoc(mainRef(), { [`logcals.${d}`]: c, [`daytags.${d}`]: tags }).catch(console.error);
+  };
   const openLog = (name) => {
     const n = (name || "").toLowerCase();
     const f = foods.find((x) => x.name.toLowerCase() === n) || foods.find((x) => x.name.toLowerCase().includes(n) || n.includes(x.name.toLowerCase()));
@@ -890,6 +906,7 @@ export default function App() {
       {mealSum && <MealSummary T={T} meal={MEALS.find((m) => m.key === mealSum)} items={day.meals[mealSum] || []} dayCal={totals.cal} settings={settings} gramTargets={gramTargets} date={date} close={() => setMealSum(null)} />}
       {nutrDetail && <NutrientDetail T={T} info={nutrDetail} day={day} foods={foods} close={() => setNutrDetail(null)} />}
       {mealCopy && <MealCopySheet T={T} destMeal={MEALS.find((m) => m.key === mealCopy.meal)} destDate={date} user={user} day={day} saveDay={saveDay} say={say} close={() => setMealCopy(null)} />}
+      {mealSend && <MealSendSheet T={T} srcMeal={MEALS.find((m) => m.key === mealSend.meal)} srcDate={date} items={day.meals[mealSend.meal] || []} appendToDay={appendToDay} say={say} close={() => setMealSend(null)} />}
       {mealMenu && (() => {
         const isDay = mealMenu === "day";
         const m = isDay ? null : MEALS.find((x) => x.key === mealMenu);
@@ -901,6 +918,11 @@ export default function App() {
             ]
           : [
               { label: `📅 Copy ${m.label} from another day…`, onTap: () => { setMealCopy({ meal: m.key }); setMealMenu(null); } },
+              ...((day.meals[m.key] || []).length ? [
+                { label: `⧉ Send ${m.label} to another day…`, onTap: () => { setMealSend({ meal: m.key }); setMealMenu(null); } },
+                { label: `📌 Save ${m.label} as idea to try`, onTap: () => { addIdea({ name: `${m.label} · ${shortDate(date)}`, items: (day.meals[m.key] || []).map((e) => ({ name: e.name, srv: e.qty || 1 })), src: "meal" }); say("Saved to try — it's on the Meals tab"); setMealMenu(null); } },
+                { label: `🧾 Turn ${m.label} into a recipe…`, onTap: () => { setRecipeOpen({ editing: { name: `${m.label} ${shortDate(date)}`, recipe: { servings: 1, items: (day.meals[m.key] || []).map((e) => ({ foodId: e.foodId, name: e.name, qty: e.qty || 1 })) } }, copy: true }); setMealMenu(null); } },
+              ] : []),
               { label: `🗑 Clear ${m.label}`, danger: true, onTap: () => { clearMeal(m.key, m.label); setMealMenu(null); } },
             ];
         return <ActionMenu T={T} title={isDay ? fmtDate(date) : `${m.icon} ${m.label}`} actions={actions} close={() => setMealMenu(null)} />;
@@ -952,7 +974,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.17</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.18</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1169,6 +1191,43 @@ function MealSummary({ T, meal, items, dayCal, settings, gramTargets, date, clos
     </div>
     <button onClick={() => setNutsOpen(!nutsOpen)} style={{ ...pill(T), width: "100%", marginTop: 10, padding: "9px", fontSize: 12.5 }}>{nutsOpen ? "Hide nutrition facts ▴" : "Nutrition facts ▾"}</button>
     {nutsOpen && <NutritionList T={T} it={{ cal: mt.cal, p: mt.p, c: mt.c, f: mt.f, fiber: mt.fiber, sugar: null, satfat: null, micros: mt.micros }} />}
+  </div></div>);
+}
+
+function MealSendSheet({ T, srcMeal, srcDate, items, appendToDay, say, close }) {
+  const [destDate, setDestDate] = useState(addDays(srcDate, 1));
+  const [destMeal, setDestMeal] = useState(srcMeal.key);
+  const [busy, setBusy] = useState(false);
+  const total = Math.round(items.reduce((a, e) => a + (e.cal || 0), 0));
+  const doSend = async () => {
+    if (!items.length || busy) return;
+    setBusy(true);
+    try {
+      await appendToDay(destDate, destMeal, items.map((e) => ({ ...e, id: uid(), time: Date.now() })));
+      say(`Copied ${items.length} item${items.length === 1 ? "" : "s"} → ${MEALS.find((m) => m.key === destMeal).label} · ${shortDate(destDate)}`);
+      close();
+    } catch (e) { console.error(e); say("Couldn't copy — try again"); setBusy(false); }
+  };
+  const ov = { position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" };
+  const sh = { background: T.bg, width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", borderRadius: "18px 18px 0 0", padding: "16px 16px calc(env(safe-area-inset-bottom) + 16px)" };
+  return (<div style={ov} onClick={close}><div style={sh} onClick={(e) => e.stopPropagation()}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 15 }}>Send {srcMeal.icon} {srcMeal.label}</div>
+        <div style={{ fontSize: 11, color: T.mut }}>{items.length} item{items.length === 1 ? "" : "s"} · {fmtN(total)} kcal · from {fmtDate(srcDate)}</div>
+      </div>
+      <button onClick={close} style={{ ...pill(T), padding: "6px 10px" }}>✕</button>
+    </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+      <button onClick={() => setDestDate(addDays(destDate, -1))} style={btn(T)}>‹</button>
+      <input type="date" value={destDate} onChange={(e) => e.target.value && setDestDate(e.target.value)} style={{ ...inp(T), flex: 1 }} />
+      <button onClick={() => setDestDate(addDays(destDate, 1))} style={btn(T)}>›</button>
+    </div>
+    <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
+      {MEALS.map((m) => (<button key={m.key} onClick={() => setDestMeal(m.key)} style={{ ...pill(T), flex: "1 1 30%", padding: "7px 2px", fontSize: 11.5, background: destMeal === m.key ? T.mintSoft : T.cardAlt, color: destMeal === m.key ? T.mint : T.sub, borderColor: destMeal === m.key ? T.mint : T.border }}>{m.icon} {m.label === "Miscellaneous" ? "Misc" : m.label}</button>))}
+    </div>
+    <button onClick={doSend} disabled={busy || !items.length} style={{ ...pill(T), width: "100%", marginTop: 12, padding: "12px", background: T.mint, color: "#fff", borderColor: T.mint }}>{busy ? "Copying…" : `Copy ${items.length} item${items.length === 1 ? "" : "s"} → ${shortDate(destDate)}`}</button>
+    <div style={{ fontSize: 10.5, color: T.mut, marginTop: 8, textAlign: "center" }}>Items land as separate entries on that day — the original stays untouched.</div>
   </div></div>);
 }
 
@@ -2720,7 +2779,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, foods, p
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.17</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.18</div>
     </div>
   </>);
 }
