@@ -386,6 +386,7 @@ export default function App() {
   const [editEntry, setEditEntry] = useState(null);
   const [mealSum, setMealSum] = useState(null);
   const [mealCopy, setMealCopy] = useState(null);
+  const [nutrDetail, setNutrDetail] = useState(null);
   const [tagFood, setTagFood] = useState(null);
   const [mealMenu, setMealMenu] = useState(null);
 
@@ -760,9 +761,9 @@ export default function App() {
               <button onClick={() => setMacroView((v) => { const n = v === "goal" ? "left" : "goal"; try { localStorage.setItem("fuel_macroview", n); } catch {} return n; })} style={{ ...pill(T), padding: "4px 10px", fontSize: 12 }}>⇄ {macroView === "goal" ? "eaten / goal" : "remaining"}</button>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              {[["Protein", totals.p, gramTargets.p, MACRO_COLORS.p], ["Carbs", totals.c, gramTargets.c, MACRO_COLORS.c], ["Fat", totals.f, gramTargets.f, MACRO_COLORS.f]].map(([l, v, g, col]) => {
+              {[["Protein", totals.p, gramTargets.p, MACRO_COLORS.p, "p"], ["Carbs", totals.c, gramTargets.c, MACRO_COLORS.c, "c"], ["Fat", totals.f, gramTargets.f, MACRO_COLORS.f, "f"]].map(([l, v, g, col, mk]) => {
                 const left = g - v, over = left < 0;
-                return (<div key={l} style={{ flex: 1 }}>
+                return (<div key={l} onClick={() => setNutrDetail({ k: mk, label: l, unit: "g", amt: g })} style={{ flex: 1, cursor: "pointer" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 11, color: T.sub }}>
                     <span><span style={{ color: col }}>●</span> {l}</span>
                     <span style={{ color: macroView === "left" && over ? T.red : T.text, fontWeight: 600, fontSize: 11.5 }}>
@@ -778,14 +779,14 @@ export default function App() {
           <div style={{ ...S.card, marginTop: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setMicrosOpen(!microsOpen)}>
               <span style={{ fontWeight: 700, fontSize: 14 }}>Nutrient targets</span>
-              <span style={{ fontSize: 12, color: T.mut }}>{microsOpen ? "hide" : "vs daily recommended ▾"}</span>
+              <span style={{ fontSize: 12, color: T.mut }}>{microsOpen ? "tap any for sources · hide" : "vs daily recommended ▾"}</span>
             </div>
             {microsOpen && <>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginTop: 12 }}>
                 {Object.keys(RDA).map((k) => {
                   const r = RDA[k]; const v = k === "fiber" ? totals.fiber : totals.micros[k]; const pct = (v / r.amt) * 100;
                   const col = r.limit ? (pct > 100 ? T.red : T.sub) : pct >= 100 ? T.green : T.mint;
-                  return (<div key={k}>
+                  return (<div key={k} onClick={() => setNutrDetail({ k, label: r.label, unit: r.unit, amt: r.amt, limit: !!r.limit })} style={{ cursor: "pointer" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
                       <span style={{ color: T.sub }}>{r.label}</span>
                       <span style={{ fontWeight: 600, color: col }}>{Math.round(pct)}%</span>
@@ -887,6 +888,7 @@ export default function App() {
       {tagFood && <TagEditor T={T} food={tagFood} foods={foods} setFoodTags={setFoodTags} patchFood={patchFood} openRecipeEdit={(f) => { setTagFood(null); setRecipeOpen({ editing: f }); }} openRecipeCopy={(f) => { setTagFood(null); setRecipeOpen({ editing: f, copy: true }); }} close={() => setTagFood(null)} say={say} />}
       {editEntry && <EntryEdit T={T} info={editEntry} foods={foods} updateEntry={updateEntry} removeEntry={removeEntry} close={() => setEditEntry(null)} say={say} />}
       {mealSum && <MealSummary T={T} meal={MEALS.find((m) => m.key === mealSum)} items={day.meals[mealSum] || []} dayCal={totals.cal} settings={settings} gramTargets={gramTargets} date={date} close={() => setMealSum(null)} />}
+      {nutrDetail && <NutrientDetail T={T} info={nutrDetail} day={day} foods={foods} close={() => setNutrDetail(null)} />}
       {mealCopy && <MealCopySheet T={T} destMeal={MEALS.find((m) => m.key === mealCopy.meal)} destDate={date} user={user} day={day} saveDay={saveDay} say={say} close={() => setMealCopy(null)} />}
       {mealMenu && (() => {
         const isDay = mealMenu === "day";
@@ -950,7 +952,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.16</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.17</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1009,6 +1011,7 @@ function FoodPick({ T, f, onPick }) {
 }
 
 const MACRO_COLORS = { c: "#2DD4BF", f: "#A78BFA", p: "#FBBF24" };
+const MEAL_COLORS = { misc: "#94A3B8", breakfast: "#FBBF24", lunch: "#2DD4BF", dinner: "#A78BFA", snacks: "#F472B6" };
 function MacroRing({ T, cal, p, c, f, size = 66 }) {
   const calC = (+c || 0) * 4, calF = (+f || 0) * 9, calP = (+p || 0) * 4;
   const tot = Math.max(1, calC + calF + calP);
@@ -1056,6 +1059,74 @@ function NutritionList({ T, it }) {
     {row("Iron", m.iron || 0, "mg")}
     {vit.map(([l, v, u]) => (v > 0 ? row(l, v, u) : null))}
   </div>);
+}
+
+function NutrientDetail({ T, info, day, foods, close }) {
+  const { k, label, unit, amt, limit } = info;
+  const isMacro = k === "p" || k === "c" || k === "f";
+  const val = (e) => (isMacro ? (+e[k] || 0) : k === "fiber" ? (+e.fiber || 0) : (+e.micros?.[k] || 0));
+  const meals = MEALS.map((m) => ({ ...m, v: (day.meals[m.key] || []).reduce((a, e) => a + val(e), 0) })).filter((m) => m.v > 0.01);
+  const total = meals.reduce((a, m) => a + m.v, 0);
+  const byFood = {};
+  MEALS.forEach((m) => (day.meals[m.key] || []).forEach((e) => {
+    const v = val(e);
+    if (v <= 0.01) return;
+    if (!byFood[e.name]) byFood[e.name] = { name: e.name, v: 0, foodId: e.foodId };
+    byFood[e.name].v += v;
+  }));
+  const tops = Object.values(byFood).sort((a, b) => b.v - a.v);
+  const maxV = tops.length ? tops[0].v : 1;
+  let sparse = 0;
+  if (!isMacro) {
+    const seen = new Set();
+    tops.forEach((x) => { if (x.foodId && !seen.has(x.foodId)) { seen.add(x.foodId); const f = (foods || []).find((y) => y.id === x.foodId); if (f && f.kind !== "recipe" && microsSparse(f)) sparse++; } });
+  }
+  const fmtV = (v) => `${v < 10 ? rnd(v, 1) : fmtN(v)} ${unit}`;
+  const pct = amt > 0 ? Math.round((total / amt) * 100) : 0;
+  const pctCol = limit ? (pct > 100 ? T.red : T.green) : pct >= 100 ? T.green : T.mint;
+  const ov = { position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 70, display: "flex", alignItems: "flex-end", justifyContent: "center" };
+  const sh = { background: T.bg, width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", borderRadius: "18px 18px 0 0", padding: "16px 16px calc(env(safe-area-inset-bottom) + 16px)" };
+  return (<div style={ov} onClick={close}><div style={sh} onClick={(e) => e.stopPropagation()}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ fontWeight: 700, fontSize: 15 }}>{label} · today</span>
+      <button onClick={close} style={{ ...pill(T), padding: "6px 10px" }}>✕</button>
+    </div>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
+      <span style={{ fontSize: 26, fontWeight: 700 }}>{fmtV(total)}</span>
+      <span style={{ fontSize: 12, color: T.sub }}>of {fmtN(amt)} {unit} {limit ? "limit" : "target"}</span>
+      <span style={{ marginLeft: "auto", fontSize: 14, fontWeight: 700, color: pctCol }}>{pct}%</span>
+    </div>
+    {total <= 0.01 && <div style={{ fontSize: 12.5, color: T.mut, marginTop: 14 }}>Nothing logged today carries {label.toLowerCase()}.</div>}
+    {total > 0.01 && <>
+      <div style={{ display: "flex", height: 14, borderRadius: 7, overflow: "hidden", background: T.barBg, marginTop: 12 }}>
+        {meals.map((m) => <div key={m.key} style={{ width: `${(m.v / total) * 100}%`, background: MEAL_COLORS[m.key] }} />)}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        {meals.map((m) => (<div key={m.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 12.5 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 5, background: MEAL_COLORS[m.key], flexShrink: 0 }} />
+          <span style={{ color: T.sub, flex: 1 }}>{m.icon} {m.label}</span>
+          <span style={{ fontWeight: 600 }}>{fmtV(m.v)}</span>
+          <span style={{ color: T.mut, fontSize: 11.5, width: 38, textAlign: "right" }}>{Math.round((m.v / total) * 100)}%</span>
+        </div>))}
+      </div>
+      <div style={{ fontWeight: 700, fontSize: 13, marginTop: 14 }}>Top sources</div>
+      <div style={{ marginTop: 2 }}>
+        {tops.slice(0, 10).map((x, i) => (<div key={i} style={{ padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+            <span style={{ color: T.mut, width: 16, flexShrink: 0, fontSize: 11 }}>{i + 1}</span>
+            <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.name}</span>
+            <span style={{ fontWeight: 600, flexShrink: 0 }}>{fmtV(x.v)}</span>
+            <span style={{ color: T.mut, fontSize: 11.5, width: 38, textAlign: "right", flexShrink: 0 }}>{Math.round((x.v / total) * 100)}%</span>
+          </div>
+          <div style={{ height: 3, background: T.barBg, borderRadius: 2, marginTop: 5, marginLeft: 24 }}>
+            <div style={{ width: `${(x.v / maxV) * 100}%`, height: 3, background: T.mint, borderRadius: 2 }} />
+          </div>
+        </div>))}
+        {tops.length > 10 && <div style={{ fontSize: 11, color: T.mut, marginTop: 6 }}>+{tops.length - 10} smaller sources</div>}
+      </div>
+      {!isMacro && sparse > 0 && <div style={{ fontSize: 10.5, color: T.amber, marginTop: 10 }}>⚠ {sparse} contributing food{sparse === 1 ? "" : "s"} still {sparse === 1 ? "has" : "have"} thin micro data — the real total is likely higher. Fill gaps in Settings → Micronutrients.</div>}
+    </>}
+  </div></div>);
 }
 
 function MealSummary({ T, meal, items, dayCal, settings, gramTargets, date, close }) {
@@ -2649,7 +2720,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, foods, p
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.16</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.17</div>
     </div>
   </>);
 }
