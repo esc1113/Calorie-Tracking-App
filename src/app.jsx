@@ -669,6 +669,10 @@ export default function App() {
   const setWater = (oz) => saveDay({ ...day, water: Math.max(0, oz) });
   const openDay = (d) => { setDate(d); setTab("today"); setDpOpen(false); };
 
+  const reloadDay = async () => {
+    const dd = await getDoc(doc(db, "fuel_users", user.uid, "days", date));
+    setDay(dd.exists() ? dd.data() : emptyDay());
+  };
   const appendToDay = async (d, mealKey, entries) => {
     if (d === date) {
       saveDay({ ...day, meals: { ...day.meals, [mealKey]: [...day.meals[mealKey], ...entries] } });
@@ -883,7 +887,7 @@ export default function App() {
         {tab === "diet" && <DietTab T={T} S={S} settings={settings} viewDate={date} day={day} todayCals={Math.round(totals.cal)} todayP={rnd(totals.p, 1)} gramTargets={gramTargets} foods={foods} ideas={ideas} addIdea={addIdea} updIdea={updIdea} delIdea={delIdea} logMany={logMany} goLibrary={() => setTab("library")} say={say} />}
         {tab === "trends" && <Trends T={T} S={S} logCals={logCals} settings={settings} weightsMap={weightsMap} setWeight={setWeight} delWeight={delWeight} stepsMap={stepsMap} setSteps={setSteps} delSteps={delSteps} tdee={tdee} openDay={openDay} say={say} />}
         {tab === "library" && <Library T={T} S={S} foods={foods} patchFood={patchFood} deleteFood={deleteFood} onLog={(f) => setSheet({ meal: autoMeal(), tab: "search", pre: f })} openEditor={(f) => setTagFood(f)} openRecipe={() => setRecipeOpen({})} openQuick={() => setQuickOpen(true)} say={say} />}
-        {tab === "settings" && <Settings T={T} S={S} settings={settings} persistSettings={persistSettings} gramTargets={gramTargets} user={user} foods={foods} patchFood={patchFood} say={say} />}
+        {tab === "settings" && <Settings T={T} S={S} settings={settings} persistSettings={persistSettings} gramTargets={gramTargets} user={user} foods={foods} patchFood={patchFood} reloadDay={reloadDay} say={say} />}
       </div>
 
       <button onClick={() => setSheet({ meal: autoMeal(), tab: "search" })}
@@ -974,7 +978,7 @@ function SignIn() {
   return (<div style={{ minHeight: "100dvh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui", padding: 24, textAlign: "center" }}>
     <div style={{ width: 72, height: 72, borderRadius: 20, background: T.mint, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700 }}>F</div>
     <div style={{ fontSize: 26, fontWeight: 700, marginTop: 16, color: T.text }}>Fuel</div>
-    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.18</div>
+    <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>Fuel v4.19</div>
     <div style={{ fontSize: 14, color: T.sub, marginTop: 6, maxWidth: 280 }}>Photo-powered food logging, micros, and your real TDEE — synced to your account.</div>
     <button onClick={goGoogle} disabled={busy} style={{ marginTop: 24, padding: "13px 22px", borderRadius: 14, border: "none", background: T.mint, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Continue with Google</button>
     <button onClick={() => setShowEmail(!showEmail)} style={{ marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Sign in with app password</button>
@@ -1655,7 +1659,10 @@ function microsSparse(f) {
   return n < 5;
 }
 
-function pickUsdaMatch(results, name) {
+const PREP_WORDS = ["pickle", "pickled", "pickles", "canned", "brine", "brined", "salted", "smoked", "cured", "breaded", "battered", "fried", "dried", "dehydrated", "sweetened", "candied", "juice", "sauce", "soup", "chips", "restaurant", "fast food"];
+
+// the v4.16 matcher, kept verbatim so the audit can reproduce (and reverse) its past picks
+function pickLoose(results, name) {
   const base = String(name || "").toLowerCase();
   const qt = foodTokens(base.split(",")[0]);
   let best = null, bestScore = 0;
@@ -1671,6 +1678,54 @@ function pickUsdaMatch(results, name) {
     if (score > bestScore) { bestScore = score; best = r; }
   });
   return best;
+}
+
+function pickUsdaMatch(results, name) {
+  const base = String(name || "").toLowerCase();
+  const qt = foodTokens(base.split(",")[0]);
+  if (!qt.length) return null;
+  let best = null, bestScore = 0;
+  (results || []).forEach((r) => {
+    const rn = String(r.name || "").toLowerCase();
+    const rt = foodTokens(rn);
+    let shared = 0;
+    qt.forEach((t) => { if (rt.some((x) => tokEq(t, x))) shared++; });
+    if (!shared) return;
+    // the USDA entry must BE the asked-for thing: its head noun must be one of the food's own words
+    const h = foodHead(r.name);
+    if (!qt.some((t) => tokEq(t, h))) return;
+    // a preparation the food never claims (pickled, canned, fried…) disqualifies the entry
+    if (PREP_WORDS.some((w) => rn.includes(w) && !base.includes(w))) return;
+    let score = shared * 10 - rt.length * 0.5;
+    if (base.includes("cook") && rn.includes("cook")) score += 4;
+    if (!base.includes("raw") && rn.includes("raw")) score -= 1;
+    if (score > bestScore) { bestScore = score; best = r; }
+  });
+  return best;
+}
+
+async function auditFill(food) {
+  const g = servG(food);
+  if (!g) return { changed: false };
+  const res = await usdaSearch(String(food.name || "").split(",")[0], true);
+  const loose = pickLoose(res, food.name);
+  const strict = pickUsdaMatch(res, food.name);
+  if (!loose || (strict && strict.name === loose.name)) return { changed: false };
+  const scale = g / 100;
+  const m = { ...M0(), ...(food.micros || {}) };
+  let fixed = 0;
+  Object.keys(M0()).forEach((k) => {
+    const oldV = rnd((loose.micros[k] || 0) * scale, 1);
+    if (oldV > 0 && +m[k] === oldV) {
+      m[k] = strict ? rnd((strict.micros[k] || 0) * scale, 1) : 0;
+      fixed++;
+    }
+  });
+  let fiber;
+  const oldF = rnd((loose.fiber || 0) * scale, 1);
+  if (oldF > 0 && +food.fiber === oldF) fiber = strict ? rnd((strict.fiber || 0) * scale, 1) : 0;
+  if (fixed === 0 && fiber === undefined) return { changed: false };
+  return { changed: true, micros: m, fiber, fixed: fixed + (fiber !== undefined ? 1 : 0), from: loose.name, to: strict ? strict.name : "no safe match" };
 }
 
 async function enrichFromUSDA(food) {
@@ -2661,7 +2716,7 @@ function RecipeBuilder({ T, foods, addFoodToLib, editing, copy, patchFood, setFo
   </div>);
 }
 
-function Settings({ T, S, settings, persistSettings, gramTargets, user, foods, patchFood, say }) {
+function Settings({ T, S, settings, persistSettings, gramTargets, user, foods, patchFood, reloadDay, say }) {
   const up = (k, v) => persistSettings({ ...settings, [k]: v });
   const pctSum = settings.macroPct.p + settings.macroPct.c + settings.macroPct.f;
   const row = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${T.border}` };
@@ -2669,6 +2724,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, foods, p
   const [pw, setPw] = useState("");
   const [pwBusy, setPwBusy] = useState(false);
   const [fillBusy, setFillBusy] = useState(false);
+  const [auditBusy, setAuditBusy] = useState(false);
   const pasteInto = async () => {
     try { const t = await navigator.clipboard.readText(); if (t) setPw(t.trim()); }
     catch { say("Clipboard blocked — long-press the field and choose Paste"); }
@@ -2771,6 +2827,56 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, foods, p
             setFillBusy(false);
           }} disabled={fillBusy} style={{ ...pill(T), width: "100%", marginTop: 10 }}>{fillBusy ? "Filling — keep the app open…" : `🧪 Fill gaps in ${todo.length} tracked food${todo.length === 1 ? "" : "s"}`}</button>
           <div style={{ fontSize: 10.5, color: T.mut, marginTop: 6 }}>Covers foods you've logged, starred, or checked ✓. New scans fill themselves automatically from now on. Recipes refresh when you re-save them.</div>
+          <button onClick={async () => {
+            if (!CFG.usdaKey) return say("Add a USDA key in index.html first");
+            if (auditBusy) return;
+            const filled = foods.filter((f) => f.kind !== "recipe" && f.mFill && servG(f));
+            if (!filled.length) return say("No past fills to audit");
+            setAuditBusy(true);
+            const fixedMap = {};
+            let vals3 = 0;
+            for (let i = 0; i < filled.length; i++) {
+              const f = filled[i];
+              try {
+                const r = await auditFill(f);
+                if (r.changed) {
+                  patchFood(f.id, { micros: r.micros, ...(r.fiber !== undefined ? { fiber: r.fiber } : {}) });
+                  fixedMap[f.id] = { ...f, micros: r.micros, fiber: r.fiber !== undefined ? r.fiber : f.fiber };
+                  vals3 += r.fixed;
+                }
+              } catch {}
+              if ((i + 1) % 5 === 0) say(`Auditing… ${i + 1}/${filled.length}`);
+              await new Promise((res) => setTimeout(res, 350));
+            }
+            let daysFixed = 0;
+            if (Object.keys(fixedMap).length) {
+              for (let i = 0; i < 14; i++) {
+                const d = addDays(todayStr(), -i);
+                try {
+                  const dd = await getDoc(doc(db, "fuel_users", user.uid, "days", d));
+                  if (!dd.exists()) continue;
+                  const nd = dd.data();
+                  let touched = false;
+                  MEALS.forEach(({ key }) => {
+                    nd.meals[key] = (nd.meals[key] || []).map((e) => {
+                      const f = fixedMap[e.foodId];
+                      if (!f) return e;
+                      const q = +e.qty > 0 ? +e.qty : 1;
+                      const mm = {};
+                      Object.keys(M0()).forEach((k) => (mm[k] = rnd((f.micros?.[k] || 0) * q, 1)));
+                      touched = true;
+                      return { ...e, micros: mm, fiber: rnd((f.fiber || 0) * q, 1) };
+                    });
+                  });
+                  if (touched) { await setDoc(doc(db, "fuel_users", user.uid, "days", d), nd); daysFixed++; }
+                } catch {}
+              }
+              if (daysFixed) reloadDay();
+            }
+            say(Object.keys(fixedMap).length ? `Audit done: corrected ${vals3} values on ${Object.keys(fixedMap).length} foods · repaired ${daysFixed} logged day${daysFixed === 1 ? "" : "s"}` : "Audit done: no bad fills found", 8000);
+            setAuditBusy(false);
+          }} disabled={auditBusy} style={{ ...pill(T), width: "100%", marginTop: 8, fontSize: 12 }}>{auditBusy ? "Auditing — keep the app open…" : "🔍 Audit past fills for bad matches"}</button>
+          <div style={{ fontSize: 10.5, color: T.mut, marginTop: 6 }}>Re-checks every earlier fill with stricter matching (a cucumber can no longer inherit pickle sodium), reverses provably bad values, and rewrites the last 14 days of log entries that carried them.</div>
         </>);
       })()}
     </div>
@@ -2779,7 +2885,7 @@ function Settings({ T, S, settings, persistSettings, gramTargets, user, foods, p
       <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>{user.email}</div>
       <button onClick={() => signOut(auth)} style={{ ...pill(T), width: "100%" }}>Sign out</button>
       <div style={{ fontSize: 11, color: T.mut, marginTop: 8 }}>Everything syncs via Firebase and works offline; changes upload when you're back online.</div>
-      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.18</div>
+      <div style={{ fontSize: 10, color: T.mut, textAlign: "center", marginTop: 14 }}>Fuel v4.19</div>
     </div>
   </>);
 }
